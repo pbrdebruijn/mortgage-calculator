@@ -38,7 +38,6 @@ export default function MortgageCalculator() {
     },
   ])
 
-  const [calculationDone, setCalculationDone] = useState(false)
   const [activeTab, setActiveTab] = useState("summary")
   const [activeMortgageId, setActiveMortgageId] = useState("mortgage-1")
   const [isCopied, setIsCopied] = useState(false)
@@ -58,7 +57,6 @@ export default function MortgageCalculator() {
             id: mortgage.id || `mortgage-${index + 1}`
           }))
           setMortgages(mortgagesWithIds)
-          setCalculationDone(true)
           toast.success("Shared mortgage data loaded!")
         }
       } catch (error) {
@@ -136,20 +134,31 @@ export default function MortgageCalculator() {
       })
   }
 
-  // Calculate mortgage details
-  const calculateMortgage = () => {
-    setCalculationDone(true)
-  }
-
   // Format currency
   const formatCurrency = (amount: number) => {
+    if (isNaN(amount) || amount === null) return "€0"
     return new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(amount)
+  }
+
+  // Format number with fallback for NaN
+  const formatNumber = (value: number, decimals = 1) => {
+    if (isNaN(value) || value === null) return "0"
+    return value.toFixed(decimals)
   }
 
   // Calculate monthly payment
   const calculateMonthlyPayment = (principal: number, rate: number, years: number) => {
+    if (isNaN(principal) || isNaN(rate) || isNaN(years) || principal <= 0 || rate <= 0 || years <= 0) {
+      return 0
+    }
+
     const monthlyRate = rate / 100 / 12
     const numberOfPayments = years * 12
+
+    if (monthlyRate === 0) {
+      return principal / numberOfPayments
+    }
+
     return (
       (principal * monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) /
       (Math.pow(1 + monthlyRate, numberOfPayments) - 1)
@@ -171,6 +180,13 @@ export default function MortgageCalculator() {
 
   // Calculate new mortgage term with extra payment (in months)
   const calculateNewTerm = () => {
+    if (isNaN(activeMortgage.amount) || isNaN(activeMortgage.interestRate) ||
+      isNaN(activeMortgage.term) || isNaN(activeMortgage.extraPayment) ||
+      activeMortgage.amount <= 0 || activeMortgage.interestRate <= 0 ||
+      activeMortgage.term <= 0 || activeMortgage.extraPayment < 0) {
+      return activeMortgage.term
+    }
+
     const monthlyRate = activeMortgage.interestRate / 100 / 12
     const numberOfPayments = activeMortgage.term * 12
     let balance = activeMortgage.amount
@@ -336,12 +352,6 @@ export default function MortgageCalculator() {
               </div>
             </div>
           </CardContent>
-          <CardFooter>
-            <Button onClick={calculateMortgage} className="w-full">
-              <Calculator className="mr-2 h-4 w-4" />
-              Calculate Impact
-            </Button>
-          </CardFooter>
         </Card>
 
         <Card>
@@ -373,9 +383,9 @@ export default function MortgageCalculator() {
           <CardContent className="space-y-6">
             <div>
               <p className="text-sm font-medium">Time Saved</p>
-              <p className="text-2xl font-bold">{(activeMortgage.term - newTerm).toFixed(1)} years</p>
+              <p className="text-2xl font-bold">{formatNumber(activeMortgage.term - newTerm)} years</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Pay off {((activeMortgage.term - newTerm) * 12).toFixed(0)} months earlier
+                Pay off {formatNumber((activeMortgage.term - newTerm) * 12, 0)} months earlier
               </p>
             </div>
 
@@ -383,66 +393,64 @@ export default function MortgageCalculator() {
               <p className="text-sm font-medium">Interest Saved</p>
               <p className="text-2xl font-bold text-green-600">{formatCurrency(interestSaved)}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {((interestSaved / totalInterest) * 100).toFixed(1)}% of total interest
+                {formatNumber((interestSaved / totalInterest) * 100)}% of total interest
               </p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {calculationDone && (
-        <div className="mt-10">
-          <Tabs defaultValue="summary" value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="summary">Summary</TabsTrigger>
-              <TabsTrigger value="chart">Payment Chart</TabsTrigger>
-              <TabsTrigger value="comparison">Comparison</TabsTrigger>
-              <TabsTrigger value="total">Total Overview</TabsTrigger>
-            </TabsList>
-            <TabsContent value="summary" className="mt-6">
-              <MortgageSummary
-                mortgageAmount={activeMortgage.amount}
-                interestRate={activeMortgage.interestRate}
-                mortgageTerm={activeMortgage.term}
-                monthlyPayment={monthlyPayment}
-                extraPayment={activeMortgage.extraPayment}
-                newTerm={newTerm}
-                interestSaved={interestSaved}
-                totalInterest={totalInterest}
-                formatCurrency={formatCurrency}
-              />
-            </TabsContent>
-            <TabsContent value="chart" className="mt-6">
-              <MortgageChart
-                mortgageAmount={activeMortgage.amount}
-                interestRate={activeMortgage.interestRate}
-                mortgageTerm={activeMortgage.term}
-                extraPayment={activeMortgage.extraPayment}
-              />
-            </TabsContent>
-            <TabsContent value="comparison" className="mt-6">
-              <MortgageComparison
-                mortgageAmount={activeMortgage.amount}
-                interestRate={activeMortgage.interestRate}
-                mortgageTerm={activeMortgage.term}
-                monthlyPayment={monthlyPayment}
-                extraPayment={activeMortgage.extraPayment}
-                newTerm={newTerm}
-                interestSaved={interestSaved}
-                totalInterest={totalInterest}
-                formatCurrency={formatCurrency}
-              />
-            </TabsContent>
-            <TabsContent value="total" className="mt-6">
-              <MortgageTotalOverview
-                mortgages={mortgages}
-                calculateMonthlyPayment={calculateMonthlyPayment}
-                formatCurrency={formatCurrency}
-              />
-            </TabsContent>
-          </Tabs>
-        </div>
-      )}
+      <div className="mt-10">
+        <Tabs defaultValue="summary" value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="summary">Summary</TabsTrigger>
+            <TabsTrigger value="chart">Payment Chart</TabsTrigger>
+            <TabsTrigger value="comparison">Comparison</TabsTrigger>
+            <TabsTrigger value="total">Total Overview</TabsTrigger>
+          </TabsList>
+          <TabsContent value="summary" className="mt-6">
+            <MortgageSummary
+              mortgageAmount={activeMortgage.amount}
+              interestRate={activeMortgage.interestRate}
+              mortgageTerm={activeMortgage.term}
+              monthlyPayment={monthlyPayment}
+              extraPayment={activeMortgage.extraPayment}
+              newTerm={newTerm}
+              interestSaved={interestSaved}
+              totalInterest={totalInterest}
+              formatCurrency={formatCurrency}
+            />
+          </TabsContent>
+          <TabsContent value="chart" className="mt-6">
+            <MortgageChart
+              mortgageAmount={activeMortgage.amount}
+              interestRate={activeMortgage.interestRate}
+              mortgageTerm={activeMortgage.term}
+              extraPayment={activeMortgage.extraPayment}
+            />
+          </TabsContent>
+          <TabsContent value="comparison" className="mt-6">
+            <MortgageComparison
+              mortgageAmount={activeMortgage.amount}
+              interestRate={activeMortgage.interestRate}
+              mortgageTerm={activeMortgage.term}
+              monthlyPayment={monthlyPayment}
+              extraPayment={activeMortgage.extraPayment}
+              newTerm={newTerm}
+              interestSaved={interestSaved}
+              totalInterest={totalInterest}
+              formatCurrency={formatCurrency}
+            />
+          </TabsContent>
+          <TabsContent value="total" className="mt-6">
+            <MortgageTotalOverview
+              mortgages={mortgages}
+              calculateMonthlyPayment={calculateMonthlyPayment}
+              formatCurrency={formatCurrency}
+            />
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   )
 }
