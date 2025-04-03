@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Calculator, Euro, Plus, Trash, TrendingDown } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Calculator, Euro, Plus, Trash, TrendingDown, Share2, Check } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,6 +12,8 @@ import { MortgageChart } from "./mortgage-chart"
 import { MortgageComparison } from "./mortgage-comparison"
 import { MortgageSummary } from "./mortgage-summary"
 import { MortgageTotalOverview } from "./mortgage-total-overview"
+import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
 // Define mortgage type
 interface Mortgage {
@@ -39,6 +41,32 @@ export default function MortgageCalculator() {
   const [calculationDone, setCalculationDone] = useState(false)
   const [activeTab, setActiveTab] = useState("summary")
   const [activeMortgageId, setActiveMortgageId] = useState("mortgage-1")
+  const [isCopied, setIsCopied] = useState(false)
+
+  // Load shared data from URL on initial load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const sharedData = params.get('data')
+
+    if (sharedData) {
+      try {
+        const decodedData = JSON.parse(atob(sharedData))
+        if (Array.isArray(decodedData) && decodedData.length > 0) {
+          // Ensure each mortgage has an ID
+          const mortgagesWithIds = decodedData.map((mortgage, index) => ({
+            ...mortgage,
+            id: mortgage.id || `mortgage-${index + 1}`
+          }))
+          setMortgages(mortgagesWithIds)
+          setCalculationDone(true)
+          toast.success("Shared mortgage data loaded!")
+        }
+      } catch (error) {
+        console.error('Error loading shared data:', error)
+        toast.error("Failed to load shared data")
+      }
+    }
+  }, [])
 
   // Get active mortgage
   const activeMortgage = mortgages.find((m) => m.id === activeMortgageId) || mortgages[0]
@@ -75,6 +103,37 @@ export default function MortgageCalculator() {
   // Update mortgage details
   const updateMortgage = (id: string, field: keyof Mortgage, value: any) => {
     setMortgages(mortgages.map((mortgage) => (mortgage.id === id ? { ...mortgage, [field]: value } : mortgage)))
+  }
+
+  // Handle number input changes
+  const handleNumberChange = (id: string, field: keyof Mortgage, value: string) => {
+    const numValue = value === '' ? 0 : Number(value)
+    updateMortgage(id, field, numValue)
+  }
+
+  // Share current mortgage data
+  const shareMortgages = () => {
+    const shareData = mortgages.map(mortgage => ({
+      id: mortgage.id,
+      name: mortgage.name,
+      amount: mortgage.amount,
+      interestRate: mortgage.interestRate,
+      term: mortgage.term,
+      extraPayment: mortgage.extraPayment
+    }))
+
+    const encodedData = btoa(JSON.stringify(shareData))
+    const shareUrl = `${window.location.origin}${window.location.pathname}?data=${encodedData}`
+
+    navigator.clipboard.writeText(shareUrl)
+      .then(() => {
+        setIsCopied(true)
+        setTimeout(() => setIsCopied(false), 2000)
+        toast.success("Share link copied to clipboard!")
+      })
+      .catch(() => {
+        toast.error("Failed to copy share link")
+      })
   }
 
   // Calculate mortgage details
@@ -137,7 +196,30 @@ export default function MortgageCalculator() {
 
   return (
     <div className="container mx-auto py-10">
-      <h1 className="text-3xl font-bold mb-6 text-center">Dutch Mortgage Extra Payment Calculator</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-center">Dutch Mortgage Extra Payment Calculator</h1>
+        <Button
+          onClick={shareMortgages}
+          variant={isCopied ? "default" : "outline"}
+          size="sm"
+          className={cn(
+            "transition-all duration-300",
+            isCopied && "bg-green-500 hover:bg-green-600"
+          )}
+        >
+          {isCopied ? (
+            <>
+              <Check className="mr-2 h-4 w-4 animate-in fade-in zoom-in" />
+              <span className="animate-in fade-in slide-in-from-left-2">Link copied!</span>
+            </>
+          ) : (
+            <>
+              <Share2 className="mr-2 h-4 w-4" />
+              <span>Share</span>
+            </>
+          )}
+        </Button>
+      </div>
       <p className="text-center text-muted-foreground mb-10">
         See the impact of making extra payments on your annuity mortgage (annuïtaire hypotheek)
       </p>
@@ -156,9 +238,8 @@ export default function MortgageCalculator() {
           {mortgages.map((mortgage) => (
             <div
               key={mortgage.id}
-              className={`relative group flex items-center rounded-lg border px-3 py-2 cursor-pointer ${
-                mortgage.id === activeMortgageId ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
-              }`}
+              className={`relative group flex items-center rounded-lg border px-3 py-2 cursor-pointer ${mortgage.id === activeMortgageId ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
+                }`}
               onClick={() => setActiveMortgageId(mortgage.id)}
             >
               <span>{mortgage.name}</span>
@@ -168,11 +249,10 @@ export default function MortgageCalculator() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`h-6 w-6 ml-2 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${
-                    mortgage.id === activeMortgageId
-                      ? "text-primary-foreground hover:bg-primary/90"
-                      : "hover:bg-muted-foreground/20"
-                  }`}
+                  className={`h-6 w-6 ml-2 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${mortgage.id === activeMortgageId
+                    ? "text-primary-foreground hover:bg-primary/90"
+                    : "hover:bg-muted-foreground/20"
+                    }`}
                   onClick={(e) => {
                     e.stopPropagation()
                     removeMortgage(mortgage.id)
@@ -210,8 +290,8 @@ export default function MortgageCalculator() {
                 <Input
                   id="mortgage-amount"
                   type="number"
-                  value={activeMortgage.amount}
-                  onChange={(e) => updateMortgage(activeMortgage.id, "amount", Number(e.target.value))}
+                  value={activeMortgage.amount || ''}
+                  onChange={(e) => handleNumberChange(activeMortgage.id, "amount", e.target.value)}
                   className="pl-9"
                 />
               </div>
@@ -225,8 +305,8 @@ export default function MortgageCalculator() {
                   id="interest-rate"
                   type="number"
                   step="0.1"
-                  value={activeMortgage.interestRate}
-                  onChange={(e) => updateMortgage(activeMortgage.id, "interestRate", Number(e.target.value))}
+                  value={activeMortgage.interestRate || ''}
+                  onChange={(e) => handleNumberChange(activeMortgage.id, "interestRate", e.target.value)}
                   className="pl-9"
                 />
               </div>
@@ -237,8 +317,8 @@ export default function MortgageCalculator() {
               <Input
                 id="mortgage-term"
                 type="number"
-                value={activeMortgage.term}
-                onChange={(e) => updateMortgage(activeMortgage.id, "term", Number(e.target.value))}
+                value={activeMortgage.term || ''}
+                onChange={(e) => handleNumberChange(activeMortgage.id, "term", e.target.value)}
               />
             </div>
 
@@ -249,8 +329,8 @@ export default function MortgageCalculator() {
                 <Input
                   id="extra-payment"
                   type="number"
-                  value={activeMortgage.extraPayment}
-                  onChange={(e) => updateMortgage(activeMortgage.id, "extraPayment", Number(e.target.value))}
+                  value={activeMortgage.extraPayment || ''}
+                  onChange={(e) => handleNumberChange(activeMortgage.id, "extraPayment", e.target.value)}
                   className="pl-9"
                 />
               </div>
