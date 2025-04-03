@@ -1,19 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Calculator, Euro, Plus, Trash, TrendingDown, Share2, Check, ChevronDown, ChevronRight } from "lucide-react"
+import { Check, ChevronDown, ChevronRight, Euro, Plus, Share2, Trash, TrendingDown } from "lucide-react"
+import { useEffect, useState } from "react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 import { MortgageChart } from "./mortgage-chart"
 import { MortgageComparison } from "./mortgage-comparison"
 import { MortgageSummary } from "./mortgage-summary"
 import { MortgageTotalOverview } from "./mortgage-total-overview"
-import { toast } from "sonner"
-import { cn } from "@/lib/utils"
 
 // Define mortgage type
 interface Mortgage {
@@ -220,7 +220,7 @@ export default function MortgageCalculator() {
   return (
     <div className="container mx-auto py-10">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-center">Dutch Mortgage Extra Payment Calculator</h1>
+        <h1 className="text-3xl font-bold text-center">Mortgage (Extra) Payment Calculator</h1>
         <Button
           onClick={shareMortgages}
           variant={isCopied ? "default" : "outline"}
@@ -250,7 +250,7 @@ export default function MortgageCalculator() {
       {/* Mortgage Cards */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Your Mortgages</h2>
+          <h2 className="text-2xl font-bold mb-4">Your Mortgages</h2>
           <Button onClick={addMortgage} variant="outline" size="sm">
             <Plus className="mr-2 h-4 w-4" />
             Add Mortgage
@@ -411,56 +411,54 @@ export default function MortgageCalculator() {
         </div>
       </div>
 
-      <div className="mt-10">
-        <Tabs defaultValue="summary" value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="summary">Summary</TabsTrigger>
-            <TabsTrigger value="chart">Payment Chart</TabsTrigger>
-            <TabsTrigger value="comparison">Comparison</TabsTrigger>
-            <TabsTrigger value="total">Total Overview</TabsTrigger>
-          </TabsList>
-          <TabsContent value="summary" className="mt-6">
-            <MortgageSummary
-              mortgageAmount={totalMortgageAmount}
-              interestRate={mortgages.reduce((sum, m) => sum + m.interestRate, 0) / mortgages.length}
-              mortgageTerm={Math.max(...mortgages.map(m => m.term))}
-              monthlyPayment={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).monthlyPayment, 0)}
-              extraPayment={mortgages.reduce((sum, m) => sum + m.extraPayment, 0)}
-              newTerm={Math.max(...mortgages.map(m => calculateMortgageDetails(m).newTerm))}
-              interestSaved={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).interestSaved, 0)}
-              totalInterest={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).totalInterest, 0)}
-              formatCurrency={formatCurrency}
-            />
-          </TabsContent>
-          <TabsContent value="chart" className="mt-6">
-            <MortgageChart
-              mortgageAmount={totalMortgageAmount}
-              interestRate={mortgages.reduce((sum, m) => sum + m.interestRate, 0) / mortgages.length}
-              mortgageTerm={Math.max(...mortgages.map(m => m.term))}
-              extraPayment={mortgages.reduce((sum, m) => sum + m.extraPayment, 0)}
-            />
-          </TabsContent>
-          <TabsContent value="comparison" className="mt-6">
-            <MortgageComparison
-              mortgageAmount={totalMortgageAmount}
-              interestRate={mortgages.reduce((sum, m) => sum + m.interestRate, 0) / mortgages.length}
-              mortgageTerm={Math.max(...mortgages.map(m => m.term))}
-              monthlyPayment={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).monthlyPayment, 0)}
-              extraPayment={mortgages.reduce((sum, m) => sum + m.extraPayment, 0)}
-              newTerm={Math.max(...mortgages.map(m => calculateMortgageDetails(m).newTerm))}
-              interestSaved={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).interestSaved, 0)}
-              totalInterest={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).totalInterest, 0)}
-              formatCurrency={formatCurrency}
-            />
-          </TabsContent>
-          <TabsContent value="total" className="mt-6">
-            <MortgageTotalOverview
-              mortgages={mortgages}
-              calculateMonthlyPayment={calculateMonthlyPayment}
-              formatCurrency={formatCurrency}
-            />
-          </TabsContent>
-        </Tabs>
+      {/* Summary Sections - All visible at once */}
+      <div className="mt-10 space-y-10">
+        {/* Summary Section */}
+        <div>
+          <h2 className="text-2xl font-bold mb-4">Summary</h2>
+          <MortgageSummary
+            mortgageAmount={totalMortgageAmount}
+            interestRate={mortgages.reduce((sum, m) => sum + m.interestRate, 0) / mortgages.length}
+            mortgageTerm={Math.max(...mortgages.map(m => m.term))}
+            monthlyPayment={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).monthlyPayment, 0)}
+            extraPayment={mortgages.reduce((sum, m) => sum + m.extraPayment, 0)}
+            newTerm={Math.max(...mortgages.map(m => calculateMortgageDetails(m).newTerm))}
+            interestSaved={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).interestSaved, 0)}
+            totalInterest={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).totalInterest, 0)}
+            formatCurrency={formatCurrency}
+          />
+        </div>
+
+        {/* Chart Section */}
+        <div>
+          <MortgageChart mortgages={mortgages} />
+        </div>
+
+        {/* Comparison Section */}
+        <div>
+          <h2 className="text-2xl font-bold mb-4">Comparison</h2>
+          <MortgageComparison
+            mortgageAmount={totalMortgageAmount}
+            interestRate={mortgages.reduce((sum, m) => sum + m.interestRate, 0) / mortgages.length}
+            mortgageTerm={Math.max(...mortgages.map(m => m.term))}
+            monthlyPayment={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).monthlyPayment, 0)}
+            extraPayment={mortgages.reduce((sum, m) => sum + m.extraPayment, 0)}
+            newTerm={Math.max(...mortgages.map(m => calculateMortgageDetails(m).newTerm))}
+            interestSaved={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).interestSaved, 0)}
+            totalInterest={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).totalInterest, 0)}
+            formatCurrency={formatCurrency}
+          />
+        </div>
+
+        {/* Total Overview Section */}
+        <div>
+          <h2 className="text-2xl font-bold mb-4">Total Overview</h2>
+          <MortgageTotalOverview
+            mortgages={mortgages}
+            calculateMonthlyPayment={calculateMonthlyPayment}
+            formatCurrency={formatCurrency}
+          />
+        </div>
       </div>
     </div>
   )

@@ -1,123 +1,161 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
+import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Legend } from "recharts"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { ChartTooltip } from "@/components/ui/chart"
 
 interface MortgageChartProps {
-  mortgageAmount: number
-  interestRate: number
-  mortgageTerm: number
-  extraPayment: number
+  mortgages: Array<{
+    id: string
+    name: string
+    amount: number
+    interestRate: number
+    term: number
+    extraPayment: number
+  }>
 }
 
-export function MortgageChart({ mortgageAmount, interestRate, mortgageTerm, extraPayment }: MortgageChartProps) {
-  const [chartData, setChartData] = useState<any[]>([])
+interface ChartDataPoint {
+  year: number
+  total: number
+  [key: string]: number
+}
+
+export function MortgageChart({ mortgages = [] }: MortgageChartProps) {
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([])
 
   useEffect(() => {
-    // Calculate mortgage amortization schedule
-    const monthlyRate = interestRate / 100 / 12
-    const numberOfPayments = mortgageTerm * 12
-    const monthlyPayment =
-      (mortgageAmount * monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) /
-      (Math.pow(1 + monthlyRate, numberOfPayments) - 1)
-
-    // Regular payment schedule
-    let regularBalance = mortgageAmount
-
-    // Extra payment schedule
-    let extraBalance = mortgageAmount
-    const totalMonthlyPayment = monthlyPayment + extraPayment
-
-    const data = []
-
-    for (let year = 0; year <= mortgageTerm; year++) {
-      // Only calculate if we still have balance
-      if (regularBalance > 0 || extraBalance > 0) {
-        // For regular payment
-        if (regularBalance > 0) {
-          for (let i = 0; i < 12; i++) {
-            const interestPayment = regularBalance * monthlyRate
-            const principalPayment = monthlyPayment - interestPayment
-            regularBalance = Math.max(0, regularBalance - principalPayment)
-          }
-        }
-
-        // For extra payment
-        if (extraBalance > 0) {
-          for (let i = 0; i < 12; i++) {
-            const interestPayment = extraBalance * monthlyRate
-            const principalPayment = totalMonthlyPayment - interestPayment
-            extraBalance = Math.max(0, extraBalance - principalPayment)
-          }
-        }
-
-        data.push({
-          year,
-          regular: Math.round(regularBalance),
-          extra: Math.round(extraBalance),
-        })
-      }
+    if (!mortgages || mortgages.length === 0) {
+      setChartData([{ year: 0, total: 0 }])
+      return
     }
 
+    // Find the longest mortgage term
+    const maxTerm = Math.max(...mortgages.map(m => m.term))
+
+    // Initialize data array with years
+    const data: ChartDataPoint[] = Array.from({ length: maxTerm + 1 }, (_, i) => ({
+      year: i,
+      total: 0,
+      ...Object.fromEntries(mortgages.map(m => [m.id, 0]))
+    }))
+
+    // Calculate balance over time for each mortgage
+    mortgages.forEach(mortgage => {
+      const monthlyRate = mortgage.interestRate / 100 / 12
+      const numberOfPayments = mortgage.term * 12
+      const monthlyPayment = mortgage.amount > 0 && mortgage.interestRate > 0 ?
+        (mortgage.amount * monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) /
+        (Math.pow(1 + monthlyRate, numberOfPayments) - 1) : 0
+
+      const totalMonthlyPayment = monthlyPayment + mortgage.extraPayment
+      let balance = mortgage.amount
+
+      for (let year = 0; year <= mortgage.term && year <= maxTerm; year++) {
+        if (balance > 0) {
+          // Calculate balance after one year of payments
+          for (let i = 0; i < 12 && balance > 0; i++) {
+            const interestPayment = balance * monthlyRate
+            const principalPayment = totalMonthlyPayment - interestPayment
+            balance = Math.max(0, balance - principalPayment)
+          }
+        }
+
+        // Update data for this mortgage
+        data[year][mortgage.id] = Math.round(balance)
+      }
+    })
+
+    // Calculate totals after all mortgages are processed
+    data.forEach(point => {
+      point.total = mortgages.reduce((sum, mortgage) => sum + (point[mortgage.id] || 0), 0)
+    })
+
     setChartData(data)
-  }, [mortgageAmount, interestRate, mortgageTerm, extraPayment])
+  }, [mortgages])
 
   // Format currency for tooltip
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(value)
   }
 
+  // Generate colors for each mortgage
+  const getLineColor = (index: number) => {
+    const colors = [
+      "hsl(var(--chart-1))",
+      "hsl(var(--chart-2))",
+      "hsl(var(--chart-3))",
+      "hsl(var(--chart-4))",
+      "hsl(var(--chart-5))",
+    ]
+    return colors[index % colors.length]
+  }
+
+  if (!mortgages || mortgages.length === 0) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Mortgage Balance Over Time</CardTitle>
+          <CardDescription>Add a mortgage to see the balance reduction over time</CardDescription>
+        </CardHeader>
+        <CardContent className="h-[300px] flex items-center justify-center text-muted-foreground">
+          No mortgage data to display
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>Mortgage Balance Over Time</CardTitle>
-        <CardDescription>Compare regular payments vs. with extra payments</CardDescription>
+        <CardDescription>Compare balance reduction for each mortgage</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="h-[400px]">
-          <ChartContainer
-            config={{
-              regular: {
-                label: "Regular Payment",
-                color: "hsl(var(--chart-1))",
-              },
-              extra: {
-                label: "With Extra Payment",
-                color: "hsl(var(--chart-2))",
-              },
-            }}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 20, right: 30, left: 30, bottom: 5 }}>
-                <XAxis dataKey="year" label={{ value: "Years", position: "insideBottom", offset: -5 }} />
-                <YAxis
-                  tickFormatter={(value) => `€${Math.round(value / 1000)}k`}
-                  label={{ value: "Balance", angle: -90, position: "insideLeft" }}
-                />
-                <ChartTooltip content={<ChartTooltipContent formatValue={(value) => formatCurrency(value)} />} />
-                <Line
-                  type="monotone"
-                  dataKey="regular"
-                  stroke="var(--color-regular)"
-                  strokeWidth={2}
-                  dot={false}
-                  name="Regular Payment"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="extra"
-                  stroke="var(--color-extra)"
-                  strokeWidth={2}
-                  dot={false}
-                  name="With Extra Payment"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartContainer>
-        </div>
+      <CardContent className="h-[300px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 10, right: 40, left: 60, bottom: 30 }}>
+            <XAxis
+              dataKey="year"
+              label={{ value: "Years", position: "insideBottom", offset: -15 }}
+              tick={{ fontSize: 12 }}
+            />
+            <YAxis
+              tickFormatter={(value) => `€${Math.round(value / 1000)}k`}
+              label={{ value: "Balance", angle: -90, position: "insideLeft", offset: 15 }}
+              tick={{ fontSize: 12 }}
+              width={70}
+            />
+            <ChartTooltip
+              formatter={(value: number) => formatCurrency(value)}
+              labelFormatter={(label: number) => `Year ${label}`}
+            />
+            <Legend />
+            {/* Line for total balance */}
+            <Line
+              type="monotone"
+              dataKey="total"
+              stroke="hsl(var(--primary))"
+              strokeWidth={3}
+              dot={false}
+              name="Total Balance"
+            />
+            {/* Lines for individual mortgages */}
+            {mortgages.map((mortgage, index) => (
+              <Line
+                key={mortgage.id}
+                type="monotone"
+                dataKey={mortgage.id}
+                stroke={getLineColor(index)}
+                strokeWidth={2}
+                strokeDasharray={index > 0 ? "5 5" : undefined}
+                dot={false}
+                name={mortgage.name}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
       </CardContent>
     </Card>
   )
