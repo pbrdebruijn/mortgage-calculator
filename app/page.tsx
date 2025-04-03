@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calculator, Euro, Plus, Trash, TrendingDown, Share2, Check } from "lucide-react"
+import { Calculator, Euro, Plus, Trash, TrendingDown, Share2, Check, ChevronDown, ChevronRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,6 +23,7 @@ interface Mortgage {
   interestRate: number
   term: number
   extraPayment: number
+  isExpanded?: boolean
 }
 
 export default function MortgageCalculator() {
@@ -35,11 +36,11 @@ export default function MortgageCalculator() {
       interestRate: 3.5,
       term: 30,
       extraPayment: 200,
+      isExpanded: true,
     },
   ])
 
   const [activeTab, setActiveTab] = useState("summary")
-  const [activeMortgageId, setActiveMortgageId] = useState("mortgage-1")
   const [isCopied, setIsCopied] = useState(false)
 
   // Load shared data from URL on initial load
@@ -54,7 +55,8 @@ export default function MortgageCalculator() {
           // Ensure each mortgage has an ID
           const mortgagesWithIds = decodedData.map((mortgage, index) => ({
             ...mortgage,
-            id: mortgage.id || `mortgage-${index + 1}`
+            id: mortgage.id || `mortgage-${index + 1}`,
+            isExpanded: index === 0 // Expand only the first mortgage
           }))
           setMortgages(mortgagesWithIds)
           toast.success("Shared mortgage data loaded!")
@@ -66,9 +68,6 @@ export default function MortgageCalculator() {
     }
   }, [])
 
-  // Get active mortgage
-  const activeMortgage = mortgages.find((m) => m.id === activeMortgageId) || mortgages[0]
-
   // Add a new mortgage
   const addMortgage = () => {
     const newId = `mortgage-${mortgages.length + 1}`
@@ -79,10 +78,12 @@ export default function MortgageCalculator() {
       interestRate: 3.5,
       term: 30,
       extraPayment: 100,
+      isExpanded: true,
     }
 
-    setMortgages([...mortgages, newMortgage])
-    setActiveMortgageId(newId)
+    // Collapse all other mortgages
+    const updatedMortgages = mortgages.map(m => ({ ...m, isExpanded: false }))
+    setMortgages([...updatedMortgages, newMortgage])
   }
 
   // Remove a mortgage
@@ -91,16 +92,20 @@ export default function MortgageCalculator() {
 
     const newMortgages = mortgages.filter((m) => m.id !== id)
     setMortgages(newMortgages)
-
-    // If we removed the active mortgage, set a new active one
-    if (id === activeMortgageId) {
-      setActiveMortgageId(newMortgages[0].id)
-    }
   }
 
   // Update mortgage details
   const updateMortgage = (id: string, field: keyof Mortgage, value: any) => {
     setMortgages(mortgages.map((mortgage) => (mortgage.id === id ? { ...mortgage, [field]: value } : mortgage)))
+  }
+
+  // Toggle mortgage expansion
+  const toggleMortgageExpansion = (id: string) => {
+    setMortgages(mortgages.map(mortgage =>
+      mortgage.id === id
+        ? { ...mortgage, isExpanded: !mortgage.isExpanded }
+        : mortgage
+    ))
   }
 
   // Handle number input changes
@@ -165,47 +170,49 @@ export default function MortgageCalculator() {
     )
   }
 
-  // Calculate mortgage details for the active mortgage
-  const monthlyPayment = calculateMonthlyPayment(
-    activeMortgage.amount,
-    activeMortgage.interestRate,
-    activeMortgage.term,
-  )
+  // Calculate mortgage details for a specific mortgage
+  const calculateMortgageDetails = (mortgage: Mortgage) => {
+    const monthlyPayment = calculateMonthlyPayment(
+      mortgage.amount,
+      mortgage.interestRate,
+      mortgage.term,
+    )
 
-  // Calculate total interest
-  const totalInterest = monthlyPayment * activeMortgage.term * 12 - activeMortgage.amount
+    const totalInterest = monthlyPayment * mortgage.term * 12 - mortgage.amount
+    const newMonthlyPayment = monthlyPayment + mortgage.extraPayment
 
-  // Calculate new monthly payment with extra payment
-  const newMonthlyPayment = monthlyPayment + activeMortgage.extraPayment
+    // Calculate new term
+    let newTerm = mortgage.term
+    if (!isNaN(mortgage.amount) && !isNaN(mortgage.interestRate) &&
+      !isNaN(mortgage.term) && !isNaN(mortgage.extraPayment) &&
+      mortgage.amount > 0 && mortgage.interestRate > 0 &&
+      mortgage.term > 0 && mortgage.extraPayment >= 0) {
 
-  // Calculate new mortgage term with extra payment (in months)
-  const calculateNewTerm = () => {
-    if (isNaN(activeMortgage.amount) || isNaN(activeMortgage.interestRate) ||
-      isNaN(activeMortgage.term) || isNaN(activeMortgage.extraPayment) ||
-      activeMortgage.amount <= 0 || activeMortgage.interestRate <= 0 ||
-      activeMortgage.term <= 0 || activeMortgage.extraPayment < 0) {
-      return activeMortgage.term
+      const monthlyRate = mortgage.interestRate / 100 / 12
+      const numberOfPayments = mortgage.term * 12
+      let balance = mortgage.amount
+      let month = 0
+
+      while (balance > 0 && month < numberOfPayments) {
+        const interestPayment = balance * monthlyRate
+        const principalPayment = newMonthlyPayment - interestPayment
+        balance -= principalPayment
+        month++
+      }
+
+      newTerm = month / 12
     }
 
-    const monthlyRate = activeMortgage.interestRate / 100 / 12
-    const numberOfPayments = activeMortgage.term * 12
-    let balance = activeMortgage.amount
-    let month = 0
+    const interestSaved = totalInterest - (newMonthlyPayment * newTerm * 12 - mortgage.amount)
 
-    while (balance > 0 && month < numberOfPayments) {
-      const interestPayment = balance * monthlyRate
-      const principalPayment = newMonthlyPayment - interestPayment
-      balance -= principalPayment
-      month++
+    return {
+      monthlyPayment,
+      totalInterest,
+      newMonthlyPayment,
+      newTerm,
+      interestSaved
     }
-
-    return month / 12
   }
-
-  const newTerm = calculateNewTerm()
-
-  // Calculate interest saved
-  const interestSaved = totalInterest - (newMonthlyPayment * newTerm * 12 - activeMortgage.amount)
 
   // Calculate total mortgage amount for all mortgages
   const totalMortgageAmount = mortgages.reduce((sum, mortgage) => sum + mortgage.amount, 0)
@@ -226,7 +233,7 @@ export default function MortgageCalculator() {
           {isCopied ? (
             <>
               <Check className="mr-2 h-4 w-4 animate-in fade-in zoom-in" />
-              <span className="animate-in fade-in slide-in-from-left-2">Link copied!</span>
+              <span className="animate-in fade-in slide-in-from-left-2">Copied!</span>
             </>
           ) : (
             <>
@@ -240,7 +247,7 @@ export default function MortgageCalculator() {
         See the impact of making extra payments on your annuity mortgage (annuïtaire hypotheek)
       </p>
 
-      {/* Mortgage Selector */}
+      {/* Mortgage Cards */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">Your Mortgages</h2>
@@ -250,154 +257,158 @@ export default function MortgageCalculator() {
           </Button>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-4">
-          {mortgages.map((mortgage) => (
-            <div
-              key={mortgage.id}
-              className={`relative group flex items-center rounded-lg border px-3 py-2 cursor-pointer ${mortgage.id === activeMortgageId ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
-                }`}
-              onClick={() => setActiveMortgageId(mortgage.id)}
-            >
-              <span>{mortgage.name}</span>
-              <span className="ml-2 text-xs opacity-70">{formatCurrency(mortgage.amount)}</span>
+        <div className="space-y-4">
+          {mortgages.map((mortgage) => {
+            const details = calculateMortgageDetails(mortgage)
 
-              {mortgages.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={`h-6 w-6 ml-2 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${mortgage.id === activeMortgageId
-                    ? "text-primary-foreground hover:bg-primary/90"
-                    : "hover:bg-muted-foreground/20"
-                    }`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    removeMortgage(mortgage.id)
-                  }}
+            return (
+              <Card key={mortgage.id} className="overflow-hidden">
+                <div
+                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50"
+                  onClick={() => toggleMortgageExpansion(mortgage.id)}
                 >
-                  <Trash className="h-3 w-3" />
-                  <span className="sr-only">Remove</span>
-                </Button>
-              )}
-            </div>
-          ))}
+                  <div className="flex items-center gap-2">
+                    {mortgage.isExpanded ? (
+                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    )}
+                    <div>
+                      <h3 className="font-medium">{mortgage.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {formatCurrency(mortgage.amount)} • {mortgage.interestRate}% • {mortgage.term} years
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {mortgage.isExpanded && (
+                      <div className="text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">{formatCurrency(details.monthlyPayment)}</span> / month
+                      </div>
+                    )}
+                    {mortgages.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeMortgage(mortgage.id)
+                        }}
+                      >
+                        <Trash className="h-4 w-4" />
+                        <span className="sr-only">Remove</span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {mortgage.isExpanded && (
+                  <CardContent className="pt-0">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor={`mortgage-name-${mortgage.id}`}>Mortgage Name</Label>
+                          <Input
+                            id={`mortgage-name-${mortgage.id}`}
+                            value={mortgage.name}
+                            onChange={(e) => updateMortgage(mortgage.id, "name", e.target.value)}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor={`mortgage-amount-${mortgage.id}`}>Mortgage Amount</Label>
+                          <div className="relative">
+                            <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id={`mortgage-amount-${mortgage.id}`}
+                              type="number"
+                              value={mortgage.amount || ''}
+                              onChange={(e) => handleNumberChange(mortgage.id, "amount", e.target.value)}
+                              className="pl-9"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor={`interest-rate-${mortgage.id}`}>Interest Rate (%)</Label>
+                          <div className="relative">
+                            <TrendingDown className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id={`interest-rate-${mortgage.id}`}
+                              type="number"
+                              step="0.1"
+                              value={mortgage.interestRate || ''}
+                              onChange={(e) => handleNumberChange(mortgage.id, "interestRate", e.target.value)}
+                              className="pl-9"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor={`mortgage-term-${mortgage.id}`}>Mortgage Term (years)</Label>
+                          <Input
+                            id={`mortgage-term-${mortgage.id}`}
+                            type="number"
+                            value={mortgage.term || ''}
+                            onChange={(e) => handleNumberChange(mortgage.id, "term", e.target.value)}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor={`extra-payment-${mortgage.id}`}>Monthly Extra Payment</Label>
+                          <div className="relative">
+                            <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id={`extra-payment-${mortgage.id}`}
+                              type="number"
+                              value={mortgage.extraPayment || ''}
+                              onChange={(e) => handleNumberChange(mortgage.id, "extraPayment", e.target.value)}
+                              className="pl-9"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div>
+                          <p className="text-sm font-medium">Regular Monthly Payment</p>
+                          <p className="text-2xl font-bold">{formatCurrency(details.monthlyPayment)}</p>
+                        </div>
+
+                        <div>
+                          <p className="text-sm font-medium">With Extra Payment</p>
+                          <p className="text-2xl font-bold">{formatCurrency(details.newMonthlyPayment)}</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {formatCurrency(mortgage.extraPayment)} extra per month
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div>
+                          <p className="text-sm font-medium">Time Saved</p>
+                          <p className="text-2xl font-bold">{formatNumber(mortgage.term - details.newTerm)} years</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Pay off {formatNumber((mortgage.term - details.newTerm) * 12, 0)} months earlier
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-sm font-medium">Interest Saved</p>
+                          <p className="text-2xl font-bold text-green-600">{formatCurrency(details.interestSaved)}</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {formatNumber((details.interestSaved / details.totalInterest) * 100)}% of total interest
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            )
+          })}
         </div>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Mortgage Details</CardTitle>
-            <CardDescription>Enter your mortgage information</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="mortgage-name">Mortgage Name</Label>
-              <Input
-                id="mortgage-name"
-                value={activeMortgage.name}
-                onChange={(e) => updateMortgage(activeMortgage.id, "name", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="mortgage-amount">Mortgage Amount</Label>
-              <div className="relative">
-                <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="mortgage-amount"
-                  type="number"
-                  value={activeMortgage.amount || ''}
-                  onChange={(e) => handleNumberChange(activeMortgage.id, "amount", e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="interest-rate">Interest Rate (%)</Label>
-              <div className="relative">
-                <TrendingDown className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="interest-rate"
-                  type="number"
-                  step="0.1"
-                  value={activeMortgage.interestRate || ''}
-                  onChange={(e) => handleNumberChange(activeMortgage.id, "interestRate", e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="mortgage-term">Mortgage Term (years)</Label>
-              <Input
-                id="mortgage-term"
-                type="number"
-                value={activeMortgage.term || ''}
-                onChange={(e) => handleNumberChange(activeMortgage.id, "term", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="extra-payment">Monthly Extra Payment</Label>
-              <div className="relative">
-                <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="extra-payment"
-                  type="number"
-                  value={activeMortgage.extraPayment || ''}
-                  onChange={(e) => handleNumberChange(activeMortgage.id, "extraPayment", e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly Payment</CardTitle>
-            <CardDescription>Regular vs. with extra payment</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <p className="text-sm font-medium">Regular Monthly Payment</p>
-              <p className="text-2xl font-bold">{formatCurrency(monthlyPayment)}</p>
-            </div>
-
-            <div>
-              <p className="text-sm font-medium">With Extra Payment</p>
-              <p className="text-2xl font-bold">{formatCurrency(newMonthlyPayment)}</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {formatCurrency(activeMortgage.extraPayment)} extra per month
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Savings Summary</CardTitle>
-            <CardDescription>The impact of your extra payments</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <p className="text-sm font-medium">Time Saved</p>
-              <p className="text-2xl font-bold">{formatNumber(activeMortgage.term - newTerm)} years</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Pay off {formatNumber((activeMortgage.term - newTerm) * 12, 0)} months earlier
-              </p>
-            </div>
-
-            <div>
-              <p className="text-sm font-medium">Interest Saved</p>
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(interestSaved)}</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {formatNumber((interestSaved / totalInterest) * 100)}% of total interest
-              </p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <div className="mt-10">
@@ -410,35 +421,35 @@ export default function MortgageCalculator() {
           </TabsList>
           <TabsContent value="summary" className="mt-6">
             <MortgageSummary
-              mortgageAmount={activeMortgage.amount}
-              interestRate={activeMortgage.interestRate}
-              mortgageTerm={activeMortgage.term}
-              monthlyPayment={monthlyPayment}
-              extraPayment={activeMortgage.extraPayment}
-              newTerm={newTerm}
-              interestSaved={interestSaved}
-              totalInterest={totalInterest}
+              mortgageAmount={totalMortgageAmount}
+              interestRate={mortgages.reduce((sum, m) => sum + m.interestRate, 0) / mortgages.length}
+              mortgageTerm={Math.max(...mortgages.map(m => m.term))}
+              monthlyPayment={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).monthlyPayment, 0)}
+              extraPayment={mortgages.reduce((sum, m) => sum + m.extraPayment, 0)}
+              newTerm={Math.max(...mortgages.map(m => calculateMortgageDetails(m).newTerm))}
+              interestSaved={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).interestSaved, 0)}
+              totalInterest={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).totalInterest, 0)}
               formatCurrency={formatCurrency}
             />
           </TabsContent>
           <TabsContent value="chart" className="mt-6">
             <MortgageChart
-              mortgageAmount={activeMortgage.amount}
-              interestRate={activeMortgage.interestRate}
-              mortgageTerm={activeMortgage.term}
-              extraPayment={activeMortgage.extraPayment}
+              mortgageAmount={totalMortgageAmount}
+              interestRate={mortgages.reduce((sum, m) => sum + m.interestRate, 0) / mortgages.length}
+              mortgageTerm={Math.max(...mortgages.map(m => m.term))}
+              extraPayment={mortgages.reduce((sum, m) => sum + m.extraPayment, 0)}
             />
           </TabsContent>
           <TabsContent value="comparison" className="mt-6">
             <MortgageComparison
-              mortgageAmount={activeMortgage.amount}
-              interestRate={activeMortgage.interestRate}
-              mortgageTerm={activeMortgage.term}
-              monthlyPayment={monthlyPayment}
-              extraPayment={activeMortgage.extraPayment}
-              newTerm={newTerm}
-              interestSaved={interestSaved}
-              totalInterest={totalInterest}
+              mortgageAmount={totalMortgageAmount}
+              interestRate={mortgages.reduce((sum, m) => sum + m.interestRate, 0) / mortgages.length}
+              mortgageTerm={Math.max(...mortgages.map(m => m.term))}
+              monthlyPayment={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).monthlyPayment, 0)}
+              extraPayment={mortgages.reduce((sum, m) => sum + m.extraPayment, 0)}
+              newTerm={Math.max(...mortgages.map(m => calculateMortgageDetails(m).newTerm))}
+              interestSaved={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).interestSaved, 0)}
+              totalInterest={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).totalInterest, 0)}
               formatCurrency={formatCurrency}
             />
           </TabsContent>
