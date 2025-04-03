@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'Mortgage Extra Payment Calculator',
+  description: 'Vibe coded with v0 and some fixes by me',
   generator: 'v0.dev',
 }
 
