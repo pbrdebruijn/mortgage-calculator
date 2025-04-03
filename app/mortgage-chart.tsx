@@ -113,9 +113,9 @@ export function MortgageChart({ mortgages = [] }: MortgageChartProps) {
         <CardTitle>Mortgage Balance Over Time</CardTitle>
         <CardDescription>Compare balance reduction for each mortgage</CardDescription>
       </CardHeader>
-      <CardContent className="h-[300px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 10, right: 40, left: 60, bottom: 30 }}>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={350}>
+          <LineChart data={chartData} margin={{ top: 0, right: 50, bottom: 20, left: 0 }}>
             <XAxis
               dataKey="year"
               label={{ value: "Years", position: "insideBottom", offset: -15 }}
@@ -131,7 +131,7 @@ export function MortgageChart({ mortgages = [] }: MortgageChartProps) {
               formatter={(value: number) => formatCurrency(value)}
               labelFormatter={(label: number) => `Year ${label}`}
             />
-            <Legend />
+            <Legend verticalAlign="top" height={36} />
             {/* Line for total balance */}
             <Line
               type="monotone"
@@ -157,7 +157,7 @@ export function MortgageChart({ mortgages = [] }: MortgageChartProps) {
           </LineChart>
         </ResponsiveContainer>
       </CardContent>
-    </Card>
+    </Card >
   )
 }
 
