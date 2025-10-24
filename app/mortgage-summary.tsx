@@ -69,8 +69,10 @@ export function MortgageSummary({
   const mortgageTerm = Math.max(...mortgages.map(m => m.term))
   const newTerm = Math.max(...mortgageDetails.map(d => d.newTerm))
 
-  // Calculate weighted average interest rate
-  const weightedInterestRate = mortgages.reduce((sum, m) => sum + (m.interestRate * m.amount), 0) / mortgageAmount
+  // Calculate weighted average interest rate (guard against division by zero)
+  const weightedInterestRate = mortgageAmount > 0
+    ? mortgages.reduce((sum, m) => sum + (m.interestRate * m.amount), 0) / mortgageAmount
+    : 0
   return (
     <div className="grid gap-6 md:grid-cols-2">
       <Card>

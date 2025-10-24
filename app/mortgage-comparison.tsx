@@ -75,11 +75,15 @@ export function MortgageComparison({
   const mortgageTerm = Math.max(...mortgages.map(m => m.term))
   const newTerm = Math.max(...mortgageDetails.map(d => d.newTerm))
 
-  // Calculate percentages for visualization
-  const regularPrincipalPercentage = (mortgageAmount / totalRegularPayments) * 100
+  // Calculate percentages for visualization (guard against division by zero)
+  const regularPrincipalPercentage = totalRegularPayments > 0
+    ? (mortgageAmount / totalRegularPayments) * 100
+    : 0
   const regularInterestPercentage = 100 - regularPrincipalPercentage
 
-  const extraPrincipalPercentage = (mortgageAmount / totalExtraPayments) * 100
+  const extraPrincipalPercentage = totalExtraPayments > 0
+    ? (mortgageAmount / totalExtraPayments) * 100
+    : 0
   const extraInterestPercentage = 100 - extraPrincipalPercentage
 
   return (
