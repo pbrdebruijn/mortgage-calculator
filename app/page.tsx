@@ -417,14 +417,8 @@ export default function MortgageCalculator() {
         <div>
           <h2 className="text-2xl font-bold mb-4">Summary</h2>
           <MortgageSummary
-            mortgageAmount={totalMortgageAmount}
-            interestRate={mortgages.reduce((sum, m) => sum + m.interestRate, 0) / mortgages.length}
-            mortgageTerm={Math.max(...mortgages.map(m => m.term))}
-            monthlyPayment={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).monthlyPayment, 0)}
-            extraPayment={mortgages.reduce((sum, m) => sum + m.extraPayment, 0)}
-            newTerm={Math.max(...mortgages.map(m => calculateMortgageDetails(m).newTerm))}
-            interestSaved={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).interestSaved, 0)}
-            totalInterest={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).totalInterest, 0)}
+            mortgages={mortgages}
+            calculateMonthlyPayment={calculateMonthlyPayment}
             formatCurrency={formatCurrency}
           />
         </div>
@@ -438,14 +432,8 @@ export default function MortgageCalculator() {
         <div>
           <h2 className="text-2xl font-bold mb-4">Comparison</h2>
           <MortgageComparison
-            mortgageAmount={totalMortgageAmount}
-            interestRate={mortgages.reduce((sum, m) => sum + m.interestRate, 0) / mortgages.length}
-            mortgageTerm={Math.max(...mortgages.map(m => m.term))}
-            monthlyPayment={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).monthlyPayment, 0)}
-            extraPayment={mortgages.reduce((sum, m) => sum + m.extraPayment, 0)}
-            newTerm={Math.max(...mortgages.map(m => calculateMortgageDetails(m).newTerm))}
-            interestSaved={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).interestSaved, 0)}
-            totalInterest={mortgages.reduce((sum, m) => sum + calculateMortgageDetails(m).totalInterest, 0)}
+            mortgages={mortgages}
+            calculateMonthlyPayment={calculateMonthlyPayment}
             formatCurrency={formatCurrency}
           />
         </div>

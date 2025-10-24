@@ -3,38 +3,87 @@ import { ArrowRight } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 
-interface MortgageComparisonProps {
-  mortgageAmount: number
+interface Mortgage {
+  id: string
+  name: string
+  amount: number
   interestRate: number
-  mortgageTerm: number
-  monthlyPayment: number
+  term: number
   extraPayment: number
-  newTerm: number
-  interestSaved: number
-  totalInterest: number
+}
+
+interface MortgageComparisonProps {
+  mortgages: Mortgage[]
+  calculateMonthlyPayment: (principal: number, rate: number, years: number) => number
   formatCurrency: (amount: number) => string
 }
 
 export function MortgageComparison({
-  mortgageAmount,
-  interestRate,
-  mortgageTerm,
-  monthlyPayment,
-  extraPayment,
-  newTerm,
-  interestSaved,
-  totalInterest,
+  mortgages,
+  calculateMonthlyPayment,
   formatCurrency,
 }: MortgageComparisonProps) {
-  // Calculate total payments
-  const totalRegularPayments = monthlyPayment * mortgageTerm * 12
-  const totalExtraPayments = (monthlyPayment + extraPayment) * newTerm * 12
+  // Calculate details for each mortgage
+  const mortgageDetails = mortgages.map((mortgage) => {
+    const monthlyPayment = calculateMonthlyPayment(mortgage.amount, mortgage.interestRate, mortgage.term)
+    const totalInterest = monthlyPayment * mortgage.term * 12 - mortgage.amount
+    const newMonthlyPayment = monthlyPayment + mortgage.extraPayment
 
-  // Calculate percentages for visualization
-  const regularPrincipalPercentage = (mortgageAmount / totalRegularPayments) * 100
+    // Calculate new term with extra payment
+    const calculateNewTerm = () => {
+      if (mortgage.amount <= 0 || mortgage.interestRate <= 0 || mortgage.term <= 0 || mortgage.extraPayment < 0) {
+        return mortgage.term
+      }
+
+      const monthlyRate = mortgage.interestRate / 100 / 12
+      const numberOfPayments = mortgage.term * 12
+      let balance = mortgage.amount
+      let month = 0
+
+      while (balance > 0 && month < numberOfPayments) {
+        const interestPayment = balance * monthlyRate
+        const principalPayment = newMonthlyPayment - interestPayment
+        balance -= principalPayment
+        month++
+      }
+
+      return month / 12
+    }
+
+    const newTerm = calculateNewTerm()
+    const interestSaved = totalInterest - (newMonthlyPayment * newTerm * 12 - mortgage.amount)
+
+    return {
+      monthlyPayment,
+      totalInterest,
+      newMonthlyPayment,
+      newTerm,
+      interestSaved,
+      regularTotalPayments: monthlyPayment * mortgage.term * 12,
+      extraTotalPayments: newMonthlyPayment * newTerm * 12,
+    }
+  })
+
+  // Calculate aggregate totals
+  const mortgageAmount = mortgages.reduce((sum, m) => sum + m.amount, 0)
+  const monthlyPayment = mortgageDetails.reduce((sum, d) => sum + d.monthlyPayment, 0)
+  const extraPayment = mortgages.reduce((sum, m) => sum + m.extraPayment, 0)
+  const totalInterest = mortgageDetails.reduce((sum, d) => sum + d.totalInterest, 0)
+  const interestSaved = mortgageDetails.reduce((sum, d) => sum + d.interestSaved, 0)
+  const totalRegularPayments = mortgageDetails.reduce((sum, d) => sum + d.regularTotalPayments, 0)
+  const totalExtraPayments = mortgageDetails.reduce((sum, d) => sum + d.extraTotalPayments, 0)
+  const mortgageTerm = Math.max(...mortgages.map(m => m.term))
+  const newTerm = Math.max(...mortgageDetails.map(d => d.newTerm))
+
+  // Calculate percentages for visualization (guard against division by zero)
+  const regularPrincipalPercentage = totalRegularPayments > 0
+    ? (mortgageAmount / totalRegularPayments) * 100
+    : 0
   const regularInterestPercentage = 100 - regularPrincipalPercentage
 
-  const extraPrincipalPercentage = (mortgageAmount / totalExtraPayments) * 100
+  const extraPrincipalPercentage = totalExtraPayments > 0
+    ? (mortgageAmount / totalExtraPayments) * 100
+    : 0
   const extraInterestPercentage = 100 - extraPrincipalPercentage
 
   return (
