@@ -96,6 +96,20 @@ export function MortgageComparison({
     ? (interestSaved / totalExtraPaymentsMade) * 100
     : 0
 
+  // Find the mortgage with the biggest time reduction for the key takeaway
+  const mortgageWithBiggestReduction = mortgages.reduce((max, mortgage, index) => {
+    const reduction = mortgage.term - mortgageDetails[index].newTerm
+    if (!max || reduction > max.reduction) {
+      return {
+        mortgage,
+        detail: mortgageDetails[index],
+        reduction,
+        index
+      }
+    }
+    return max
+  }, null as { mortgage: Mortgage; detail: any; reduction: number; index: number } | null)
+
   return (
     <div className="space-y-8">
       <div className="grid gap-6 md:grid-cols-2">
@@ -237,9 +251,16 @@ export function MortgageComparison({
             </div>
             <p className="text-sm text-muted-foreground">
               By adding just {formatCurrency(extraPayment)} to your monthly payment, you'll save{" "}
-              {formatCurrency(interestSaved)} in interest and pay off your mortgage{" "}
-              {(mortgageTerm - newTerm).toFixed(1)} years earlier. This is a return of{" "}
-              {returnOnExtraPayments.toFixed(1)}% on your extra payments.
+              {formatCurrency(interestSaved)} in interest and pay off your mortgages{" "}
+              {(mortgageTerm - newTerm).toFixed(1)} years earlier overall.
+              {mortgageWithBiggestReduction && mortgageWithBiggestReduction.reduction > 0 && (
+                <>
+                  {" "}Most dramatically, your <strong>{mortgageWithBiggestReduction.mortgage.name}</strong> will be paid off in just{" "}
+                  <strong>{mortgageWithBiggestReduction.detail.newTerm.toFixed(1)} years</strong> instead of{" "}
+                  {mortgageWithBiggestReduction.mortgage.term} years — essentially turning a {mortgageWithBiggestReduction.mortgage.term}-year loan into a {mortgageWithBiggestReduction.detail.newTerm.toFixed(1)}-year loan!
+                </>
+              )}
+              {" "}This is a return of {returnOnExtraPayments.toFixed(1)}% on your extra payments.
             </p>
           </div>
         </CardContent>
