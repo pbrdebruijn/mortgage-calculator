@@ -132,24 +132,26 @@ export function MortgageChart({ mortgages = [] }: MortgageChartProps) {
               labelFormatter={(label: number) => `Year ${label}`}
             />
             <Legend verticalAlign="top" height={36} />
-            {/* Line for total balance */}
-            <Line
-              type="monotone"
-              dataKey="total"
-              stroke="hsl(var(--primary))"
-              strokeWidth={3}
-              dot={false}
-              name="Total Balance"
-            />
+            {/* Line for total balance - only show when there are multiple mortgages */}
+            {mortgages.length > 1 && (
+              <Line
+                type="monotone"
+                dataKey="total"
+                stroke="hsl(var(--primary))"
+                strokeWidth={3}
+                dot={false}
+                name="Total Balance"
+              />
+            )}
             {/* Lines for individual mortgages */}
             {mortgages.map((mortgage, index) => (
               <Line
                 key={mortgage.id}
                 type="monotone"
                 dataKey={mortgage.id}
-                stroke={getLineColor(index)}
-                strokeWidth={2}
-                strokeDasharray={index > 0 ? "5 5" : undefined}
+                stroke={mortgages.length === 1 ? "hsl(var(--primary))" : getLineColor(index)}
+                strokeWidth={mortgages.length === 1 ? 3 : 2}
+                strokeDasharray={mortgages.length > 1 && index > 0 ? "5 5" : undefined}
                 dot={false}
                 name={mortgage.name}
               />
