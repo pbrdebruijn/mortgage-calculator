@@ -86,6 +86,16 @@ export function MortgageComparison({
     : 0
   const extraInterestPercentage = 100 - extraPrincipalPercentage
 
+  // Calculate total extra payments actually made across all mortgages
+  const totalExtraPaymentsMade = mortgageDetails.reduce((sum, detail, index) => {
+    return sum + (mortgages[index].extraPayment * detail.newTerm * 12)
+  }, 0)
+
+  // Calculate return on extra payments (guard against division by zero)
+  const returnOnExtraPayments = totalExtraPaymentsMade > 0
+    ? (interestSaved / totalExtraPaymentsMade) * 100
+    : 0
+
   return (
     <div className="space-y-8">
       <div className="grid gap-6 md:grid-cols-2">
@@ -228,8 +238,8 @@ export function MortgageComparison({
             <p className="text-sm text-muted-foreground">
               By adding just {formatCurrency(extraPayment)} to your monthly payment, you'll save{" "}
               {formatCurrency(interestSaved)} in interest and pay off your mortgage{" "}
-              {(mortgageTerm - newTerm).toFixed(1)} years earlier. This is a return of
-              {((interestSaved / (extraPayment * newTerm * 12)) * 100).toFixed(1)}% on your extra payments.
+              {(mortgageTerm - newTerm).toFixed(1)} years earlier. This is a return of{" "}
+              {returnOnExtraPayments.toFixed(1)}% on your extra payments.
             </p>
           </div>
         </CardContent>
