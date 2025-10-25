@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { MortgageChart } from "./mortgage-chart"
 import { MortgageComparison } from "./mortgage-comparison"
 import { MortgageSummary } from "./mortgage-summary"
@@ -221,27 +222,30 @@ export default function MortgageCalculator() {
     <div className="container mx-auto py-10">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-center">Mortgage (Extra) Payment Calculator</h1>
-        <Button
-          onClick={shareMortgages}
-          variant={isCopied ? "default" : "outline"}
-          size="sm"
-          className={cn(
-            "transition-all duration-300",
-            isCopied && "bg-green-500 hover:bg-green-600"
-          )}
-        >
-          {isCopied ? (
-            <>
-              <Check className="mr-2 h-4 w-4 animate-in fade-in zoom-in" />
-              <span className="animate-in fade-in slide-in-from-left-2">Copied!</span>
-            </>
-          ) : (
-            <>
-              <Share2 className="mr-2 h-4 w-4" />
-              <span>Share</span>
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Button
+            onClick={shareMortgages}
+            variant={isCopied ? "default" : "outline"}
+            size="sm"
+            className={cn(
+              "transition-all duration-300",
+              isCopied && "bg-green-500 hover:bg-green-600"
+            )}
+          >
+            {isCopied ? (
+              <>
+                <Check className="mr-2 h-4 w-4 animate-in fade-in zoom-in" />
+                <span className="animate-in fade-in slide-in-from-left-2">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="mr-2 h-4 w-4" />
+                <span>Share</span>
+              </>
+            )}
+          </Button>
+        </div>
       </div>
       <p className="text-center text-muted-foreground mb-10">
         See the impact of making extra payments on your annuity mortgage (annuïtaire hypotheek)
