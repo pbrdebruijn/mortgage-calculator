@@ -24,6 +24,9 @@ interface Mortgage {
   interestRate: number
   term: number
   extraPayment: number
+  singleExtraPayment?: number
+  singlePaymentMonth?: number
+  singlePaymentYear?: number
   isExpanded?: boolean
 }
 
@@ -37,6 +40,9 @@ export default function MortgageCalculator() {
       interestRate: 3.5,
       term: 30,
       extraPayment: 200,
+      singleExtraPayment: 0,
+      singlePaymentMonth: new Date().getMonth() + 1,
+      singlePaymentYear: new Date().getFullYear(),
       isExpanded: true,
     },
   ])
@@ -79,6 +85,9 @@ export default function MortgageCalculator() {
       interestRate: 3.5,
       term: 30,
       extraPayment: 100,
+      singleExtraPayment: 0,
+      singlePaymentMonth: new Date().getMonth() + 1,
+      singlePaymentYear: new Date().getFullYear(),
       isExpanded: true,
     }
 
@@ -123,7 +132,10 @@ export default function MortgageCalculator() {
       amount: mortgage.amount,
       interestRate: mortgage.interestRate,
       term: mortgage.term,
-      extraPayment: mortgage.extraPayment
+      extraPayment: mortgage.extraPayment,
+      singleExtraPayment: mortgage.singleExtraPayment,
+      singlePaymentMonth: mortgage.singlePaymentMonth,
+      singlePaymentYear: mortgage.singlePaymentYear
     }))
 
     const encodedData = btoa(JSON.stringify(shareData))
@@ -182,8 +194,10 @@ export default function MortgageCalculator() {
     const totalInterest = monthlyPayment * mortgage.term * 12 - mortgage.amount
     const newMonthlyPayment = monthlyPayment + mortgage.extraPayment
 
-    // Calculate new term
+    // Calculate new term with extra payments and single payment
     let newTerm = mortgage.term
+    let totalPaidWithExtras = 0
+
     if (!isNaN(mortgage.amount) && !isNaN(mortgage.interestRate) &&
       !isNaN(mortgage.term) && !isNaN(mortgage.extraPayment) &&
       mortgage.amount > 0 && mortgage.interestRate > 0 &&
@@ -194,17 +208,41 @@ export default function MortgageCalculator() {
       let balance = mortgage.amount
       let month = 0
 
+      // Calculate the month when single payment should be applied
+      const currentDate = new Date()
+      const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+      const singlePaymentDate = mortgage.singlePaymentMonth && mortgage.singlePaymentYear
+        ? new Date(mortgage.singlePaymentYear, mortgage.singlePaymentMonth - 1, 1)
+        : null
+
+      // Calculate months from start until single payment
+      let singlePaymentMonthIndex = -1
+      if (singlePaymentDate && mortgage.singleExtraPayment && mortgage.singleExtraPayment > 0) {
+        const monthsDiff = (singlePaymentDate.getFullYear() - startDate.getFullYear()) * 12 +
+                          (singlePaymentDate.getMonth() - startDate.getMonth())
+        if (monthsDiff >= 0 && monthsDiff < numberOfPayments) {
+          singlePaymentMonthIndex = monthsDiff
+        }
+      }
+
       while (balance > 0 && month < numberOfPayments) {
         const interestPayment = balance * monthlyRate
-        const principalPayment = newMonthlyPayment - interestPayment
+        let principalPayment = newMonthlyPayment - interestPayment
+
+        // Apply single extra payment at the specified month
+        if (month === singlePaymentMonthIndex) {
+          principalPayment += (mortgage.singleExtraPayment || 0)
+        }
+
         balance -= principalPayment
+        totalPaidWithExtras += newMonthlyPayment + (month === singlePaymentMonthIndex ? (mortgage.singleExtraPayment || 0) : 0)
         month++
       }
 
       newTerm = month / 12
     }
 
-    const interestSaved = totalInterest - (newMonthlyPayment * newTerm * 12 - mortgage.amount)
+    const interestSaved = totalInterest - (totalPaidWithExtras - mortgage.amount)
 
     return {
       monthlyPayment,
@@ -371,6 +409,45 @@ export default function MortgageCalculator() {
                               className="pl-9"
                             />
                           </div>
+                        </div>
+
+                        <div className="space-y-2 pt-4 border-t">
+                          <Label htmlFor={`single-payment-${mortgage.id}`}>Single Extra Payment</Label>
+                          <div className="relative">
+                            <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id={`single-payment-${mortgage.id}`}
+                              type="number"
+                              value={mortgage.singleExtraPayment || ''}
+                              onChange={(e) => handleNumberChange(mortgage.id, "singleExtraPayment", e.target.value)}
+                              className="pl-9"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor={`single-payment-month-${mortgage.id}`}>Payment Month</Label>
+                          <Input
+                            id={`single-payment-month-${mortgage.id}`}
+                            type="number"
+                            min="1"
+                            max="12"
+                            value={mortgage.singlePaymentMonth || ''}
+                            onChange={(e) => handleNumberChange(mortgage.id, "singlePaymentMonth", e.target.value)}
+                            placeholder="1-12"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor={`single-payment-year-${mortgage.id}`}>Payment Year</Label>
+                          <Input
+                            id={`single-payment-year-${mortgage.id}`}
+                            type="number"
+                            value={mortgage.singlePaymentYear || ''}
+                            onChange={(e) => handleNumberChange(mortgage.id, "singlePaymentYear", e.target.value)}
+                            placeholder={new Date().getFullYear().toString()}
+                          />
                         </div>
                       </div>
 
