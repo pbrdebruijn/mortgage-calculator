@@ -1,13 +1,16 @@
 "use client"
 
-import { Check, ChevronDown, ChevronRight, Euro, Plus, Share2, Trash, TrendingDown } from "lucide-react"
+import { Calendar as CalendarIcon, Check, ChevronDown, ChevronRight, Euro, Plus, Share2, Trash, TrendingDown, X } from "lucide-react"
 import { useEffect, useState } from "react"
+import { format } from "date-fns"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -15,6 +18,13 @@ import { MortgageChart } from "./mortgage-chart"
 import { MortgageComparison } from "./mortgage-comparison"
 import { MortgageSummary } from "./mortgage-summary"
 import { MortgageTotalOverview } from "./mortgage-total-overview"
+
+// Define single payment type
+interface SinglePayment {
+  id: string
+  amount: number
+  date: Date
+}
 
 // Define mortgage type
 interface Mortgage {
@@ -24,9 +34,7 @@ interface Mortgage {
   interestRate: number
   term: number
   extraPayment: number
-  singleExtraPayment?: number
-  singlePaymentMonth?: number
-  singlePaymentYear?: number
+  singlePayments: SinglePayment[]
   isExpanded?: boolean
 }
 
@@ -40,9 +48,7 @@ export default function MortgageCalculator() {
       interestRate: 3.5,
       term: 30,
       extraPayment: 200,
-      singleExtraPayment: 0,
-      singlePaymentMonth: new Date().getMonth() + 1,
-      singlePaymentYear: new Date().getFullYear(),
+      singlePayments: [],
       isExpanded: true,
     },
   ])
@@ -59,10 +65,14 @@ export default function MortgageCalculator() {
       try {
         const decodedData = JSON.parse(atob(sharedData))
         if (Array.isArray(decodedData) && decodedData.length > 0) {
-          // Ensure each mortgage has an ID
+          // Ensure each mortgage has an ID and convert date strings back to Date objects
           const mortgagesWithIds = decodedData.map((mortgage, index) => ({
             ...mortgage,
             id: mortgage.id || `mortgage-${index + 1}`,
+            singlePayments: (mortgage.singlePayments || []).map((p: any) => ({
+              ...p,
+              date: new Date(p.date)
+            })),
             isExpanded: index === 0 // Expand only the first mortgage
           }))
           setMortgages(mortgagesWithIds)
@@ -85,15 +95,59 @@ export default function MortgageCalculator() {
       interestRate: 3.5,
       term: 30,
       extraPayment: 100,
-      singleExtraPayment: 0,
-      singlePaymentMonth: new Date().getMonth() + 1,
-      singlePaymentYear: new Date().getFullYear(),
+      singlePayments: [],
       isExpanded: true,
     }
 
     // Collapse all other mortgages
     const updatedMortgages = mortgages.map(m => ({ ...m, isExpanded: false }))
     setMortgages([...updatedMortgages, newMortgage])
+  }
+
+  // Add a single payment to a mortgage
+  const addSinglePayment = (mortgageId: string) => {
+    setMortgages(mortgages.map(mortgage => {
+      if (mortgage.id === mortgageId) {
+        const newPayment: SinglePayment = {
+          id: `payment-${Date.now()}`,
+          amount: 0,
+          date: new Date()
+        }
+        return {
+          ...mortgage,
+          singlePayments: [...mortgage.singlePayments, newPayment]
+        }
+      }
+      return mortgage
+    }))
+  }
+
+  // Remove a single payment from a mortgage
+  const removeSinglePayment = (mortgageId: string, paymentId: string) => {
+    setMortgages(mortgages.map(mortgage => {
+      if (mortgage.id === mortgageId) {
+        return {
+          ...mortgage,
+          singlePayments: mortgage.singlePayments.filter(p => p.id !== paymentId)
+        }
+      }
+      return mortgage
+    }))
+  }
+
+  // Update a single payment
+  const updateSinglePayment = (mortgageId: string, paymentId: string, field: keyof SinglePayment, value: any) => {
+    setMortgages(mortgages.map(mortgage => {
+      if (mortgage.id === mortgageId) {
+        return {
+          ...mortgage,
+          singlePayments: mortgage.singlePayments.map(payment =>
+            payment.id === paymentId ? { ...payment, [field]: value } : payment
+          )
+        }
+      }
+      return mortgage
+    }))
   }
 
   // Remove a mortgage
@@ -133,9 +187,11 @@ export default function MortgageCalculator() {
       interestRate: mortgage.interestRate,
       term: mortgage.term,
       extraPayment: mortgage.extraPayment,
-      singleExtraPayment: mortgage.singleExtraPayment,
-      singlePaymentMonth: mortgage.singlePaymentMonth,
-      singlePaymentYear: mortgage.singlePaymentYear
+      singlePayments: mortgage.singlePayments.map(p => ({
+        id: p.id,
+        amount: p.amount,
+        date: p.date.toISOString()
+      }))
     }))
 
     const encodedData = btoa(JSON.stringify(shareData))
@@ -194,7 +250,7 @@ export default function MortgageCalculator() {
     const totalInterest = monthlyPayment * mortgage.term * 12 - mortgage.amount
     const newMonthlyPayment = monthlyPayment + mortgage.extraPayment
 
-    // Calculate new term with extra payments and single payment
+    // Calculate new term with extra payments and single payments
     let newTerm = mortgage.term
     let totalPaidWithExtras = 0
 
@@ -208,34 +264,34 @@ export default function MortgageCalculator() {
       let balance = mortgage.amount
       let month = 0
 
-      // Calculate the month when single payment should be applied
+      // Calculate the month when each single payment should be applied
       const currentDate = new Date()
       const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
-      const singlePaymentDate = mortgage.singlePaymentMonth && mortgage.singlePaymentYear
-        ? new Date(mortgage.singlePaymentYear, mortgage.singlePaymentMonth - 1, 1)
-        : null
 
-      // Calculate months from start until single payment
-      let singlePaymentMonthIndex = -1
-      if (singlePaymentDate && mortgage.singleExtraPayment && mortgage.singleExtraPayment > 0) {
-        const monthsDiff = (singlePaymentDate.getFullYear() - startDate.getFullYear()) * 12 +
-                          (singlePaymentDate.getMonth() - startDate.getMonth())
-        if (monthsDiff >= 0 && monthsDiff < numberOfPayments) {
-          singlePaymentMonthIndex = monthsDiff
+      // Create a map of month index to total single payment amount for that month
+      const singlePaymentsByMonth = new Map<number, number>()
+      mortgage.singlePayments.forEach(payment => {
+        if (payment.amount > 0) {
+          const paymentDate = new Date(payment.date)
+          const monthsDiff = (paymentDate.getFullYear() - startDate.getFullYear()) * 12 +
+                            (paymentDate.getMonth() - startDate.getMonth())
+          if (monthsDiff >= 0 && monthsDiff < numberOfPayments) {
+            const existing = singlePaymentsByMonth.get(monthsDiff) || 0
+            singlePaymentsByMonth.set(monthsDiff, existing + payment.amount)
+          }
         }
-      }
+      })
 
       while (balance > 0 && month < numberOfPayments) {
         const interestPayment = balance * monthlyRate
         let principalPayment = newMonthlyPayment - interestPayment
 
-        // Apply single extra payment at the specified month
-        if (month === singlePaymentMonthIndex) {
-          principalPayment += (mortgage.singleExtraPayment || 0)
-        }
+        // Apply any single extra payments at this month
+        const singlePaymentAmount = singlePaymentsByMonth.get(month) || 0
+        principalPayment += singlePaymentAmount
 
         balance -= principalPayment
-        totalPaidWithExtras += newMonthlyPayment + (month === singlePaymentMonthIndex ? (mortgage.singleExtraPayment || 0) : 0)
+        totalPaidWithExtras += newMonthlyPayment + singlePaymentAmount
         month++
       }
 
@@ -411,43 +467,86 @@ export default function MortgageCalculator() {
                           </div>
                         </div>
 
-                        <div className="space-y-2 pt-4 border-t">
-                          <Label htmlFor={`single-payment-${mortgage.id}`}>Single Extra Payment</Label>
-                          <div className="relative">
-                            <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              id={`single-payment-${mortgage.id}`}
-                              type="number"
-                              value={mortgage.singleExtraPayment || ''}
-                              onChange={(e) => handleNumberChange(mortgage.id, "singleExtraPayment", e.target.value)}
-                              className="pl-9"
-                              placeholder="0"
-                            />
+                        <div className="space-y-3 pt-4 border-t">
+                          <div className="flex items-center justify-between">
+                            <Label>Single Extra Payments</Label>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addSinglePayment(mortgage.id)}
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              Add Payment
+                            </Button>
                           </div>
-                        </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor={`single-payment-month-${mortgage.id}`}>Payment Month</Label>
-                          <Input
-                            id={`single-payment-month-${mortgage.id}`}
-                            type="number"
-                            min="1"
-                            max="12"
-                            value={mortgage.singlePaymentMonth || ''}
-                            onChange={(e) => handleNumberChange(mortgage.id, "singlePaymentMonth", e.target.value)}
-                            placeholder="1-12"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor={`single-payment-year-${mortgage.id}`}>Payment Year</Label>
-                          <Input
-                            id={`single-payment-year-${mortgage.id}`}
-                            type="number"
-                            value={mortgage.singlePaymentYear || ''}
-                            onChange={(e) => handleNumberChange(mortgage.id, "singlePaymentYear", e.target.value)}
-                            placeholder={new Date().getFullYear().toString()}
-                          />
+                          {mortgage.singlePayments.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No single payments added</p>
+                          ) : (
+                            <div className="space-y-3">
+                              {mortgage.singlePayments.map((payment) => (
+                                <Card key={payment.id} className="p-3">
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <Label className="text-sm">Payment Amount</Label>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={() => removeSinglePayment(mortgage.id, payment.id)}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                    <div className="relative">
+                                      <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                      <Input
+                                        type="number"
+                                        value={payment.amount || ''}
+                                        onChange={(e) => {
+                                          const value = e.target.value === '' ? 0 : Number(e.target.value)
+                                          updateSinglePayment(mortgage.id, payment.id, "amount", value)
+                                        }}
+                                        className="pl-9"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-sm mb-2 block">Payment Date</Label>
+                                      <Popover>
+                                        <PopoverTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            className={cn(
+                                              "w-full justify-start text-left font-normal",
+                                              !payment.date && "text-muted-foreground"
+                                            )}
+                                          >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {payment.date ? format(payment.date, "PPP") : <span>Pick a date</span>}
+                                          </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                          <Calendar
+                                            mode="single"
+                                            selected={payment.date}
+                                            onSelect={(date) => {
+                                              if (date) {
+                                                updateSinglePayment(mortgage.id, payment.id, "date", date)
+                                              }
+                                            }}
+                                            initialFocus
+                                          />
+                                        </PopoverContent>
+                                      </Popover>
+                                    </div>
+                                  </div>
+                                </Card>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
 
