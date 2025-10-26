@@ -1,7 +1,7 @@
 "use client"
 
 import { Calendar as CalendarIcon, Check, ChevronDown, ChevronRight, Euro, Plus, Share2, Trash, TrendingDown, X } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { format } from "date-fns"
 
 import { Button } from "@/components/ui/button"
@@ -63,6 +63,9 @@ export default function MortgageCalculator() {
   const [editingMortgageId, setEditingMortgageId] = useState<string | null>(null)
   const [draftSinglePayments, setDraftSinglePayments] = useState<SinglePayment[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // State for tracking timeline visibility
+  const [isTimelineOpen, setIsTimelineOpen] = useState(false)
 
   // Load shared data from URL on initial load
   useEffect(() => {
@@ -281,8 +284,8 @@ export default function MortgageCalculator() {
     balance: number
   }
 
-  // Calculate mortgage details for a specific mortgage with full schedule
-  const calculateMortgageDetails = (mortgage: Mortgage) => {
+  // Calculate mortgage details for a specific mortgage (with optional schedule generation)
+  const calculateMortgageDetails = (mortgage: Mortgage, includeSchedule: boolean = false) => {
     const monthlyPayment = calculateMonthlyPayment(
       mortgage.amount,
       mortgage.interestRate,
@@ -338,20 +341,23 @@ export default function MortgageCalculator() {
         const actualTotalPrincipal = balance - newBalance
         const totalPaymentAmount = interestPayment + actualTotalPrincipal
 
-        const paymentDate = new Date(startDate)
-        paymentDate.setMonth(paymentDate.getMonth() + month)
+        // Only generate schedule if requested
+        if (includeSchedule) {
+          const paymentDate = new Date(startDate)
+          paymentDate.setMonth(paymentDate.getMonth() + month)
 
-        schedule.push({
-          month: month + 1,
-          date: paymentDate,
-          payment: monthlyPayment,
-          principal: regularPrincipal,
-          interest: interestPayment,
-          extraPayment: month < numberOfPayments ? mortgage.extraPayment : 0,
-          singlePayment: singlePaymentAmount,
-          totalPayment: totalPaymentAmount,
-          balance: newBalance
-        })
+          schedule.push({
+            month: month + 1,
+            date: paymentDate,
+            payment: monthlyPayment,
+            principal: regularPrincipal,
+            interest: interestPayment,
+            extraPayment: month < numberOfPayments ? mortgage.extraPayment : 0,
+            singlePayment: singlePaymentAmount,
+            totalPayment: totalPaymentAmount,
+            balance: newBalance
+          })
+        }
 
         balance = newBalance
         totalPaidWithExtras += totalPaymentAmount
@@ -373,12 +379,16 @@ export default function MortgageCalculator() {
     }
   }
 
-  // Generate unified timeline from all mortgages
-  const generateUnifiedTimeline = (): UnifiedScheduleEntry[] => {
+  // Generate unified timeline from all mortgages (memoized and only when timeline is open)
+  const unifiedTimeline = useMemo(() => {
+    if (!isTimelineOpen) {
+      return []
+    }
+
     const allEntries: UnifiedScheduleEntry[] = []
 
     mortgages.forEach(mortgage => {
-      const details = calculateMortgageDetails(mortgage)
+      const details = calculateMortgageDetails(mortgage, true) // Include schedule
       details.schedule.forEach(entry => {
         allEntries.push({
           date: entry.date,
@@ -397,7 +407,15 @@ export default function MortgageCalculator() {
 
     // Sort by date
     return allEntries.sort((a, b) => a.date.getTime() - b.date.getTime())
-  }
+  }, [mortgages, isTimelineOpen])
+
+  // Calculate total payment count efficiently (without generating full schedule)
+  const totalPaymentCount = useMemo(() => {
+    return mortgages.reduce((count, mortgage) => {
+      const details = calculateMortgageDetails(mortgage, false) // Don't include schedule
+      return count + Math.ceil(details.newTerm * 12)
+    }, 0)
+  }, [mortgages])
 
   // Calculate total mortgage amount for all mortgages
   const totalMortgageAmount = mortgages.reduce((sum, mortgage) => sum + mortgage.amount, 0)
@@ -644,11 +662,11 @@ export default function MortgageCalculator() {
           <h2 className="text-2xl font-bold mb-4">Payment Timeline</h2>
           <Card>
             <CardContent className="pt-6">
-              <Collapsible>
+              <Collapsible open={isTimelineOpen} onOpenChange={setIsTimelineOpen}>
                 <CollapsibleTrigger asChild>
                   <Button variant="outline" className="w-full justify-between">
                     <span className="font-semibold">
-                      View Complete Payment Timeline ({generateUnifiedTimeline().length} payments across all mortgages)
+                      View Complete Payment Timeline ({totalPaymentCount} payments across all mortgages)
                     </span>
                     <ChevronDown className="h-4 w-4" />
                   </Button>
@@ -670,7 +688,7 @@ export default function MortgageCalculator() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {generateUnifiedTimeline().map((entry, index) => (
+                        {unifiedTimeline.map((entry, index) => (
                           <TableRow
                             key={`${entry.mortgageId}-${index}`}
                             className={index % 2 === 0 ? "bg-muted/30" : ""}
