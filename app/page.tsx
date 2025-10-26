@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -239,7 +241,20 @@ export default function MortgageCalculator() {
     )
   }
 
-  // Calculate mortgage details for a specific mortgage
+  // Payment schedule entry interface
+  interface ScheduleEntry {
+    month: number
+    date: Date
+    payment: number
+    principal: number
+    interest: number
+    extraPayment: number
+    singlePayment: number
+    totalPayment: number
+    balance: number
+  }
+
+  // Calculate mortgage details for a specific mortgage with full schedule
   const calculateMortgageDetails = (mortgage: Mortgage) => {
     const monthlyPayment = calculateMonthlyPayment(
       mortgage.amount,
@@ -253,6 +268,7 @@ export default function MortgageCalculator() {
     // Calculate new term with extra payments and single payments
     let newTerm = mortgage.term
     let totalPaidWithExtras = 0
+    const schedule: ScheduleEntry[] = []
 
     if (!isNaN(mortgage.amount) && !isNaN(mortgage.interestRate) &&
       !isNaN(mortgage.term) && !isNaN(mortgage.extraPayment) &&
@@ -284,14 +300,34 @@ export default function MortgageCalculator() {
 
       while (balance > 0 && month < numberOfPayments) {
         const interestPayment = balance * monthlyRate
-        let principalPayment = newMonthlyPayment - interestPayment
-
-        // Apply any single extra payments at this month
+        const regularPrincipal = monthlyPayment - interestPayment
+        const extraPrincipal = mortgage.extraPayment
         const singlePaymentAmount = singlePaymentsByMonth.get(month) || 0
-        principalPayment += singlePaymentAmount
 
-        balance -= principalPayment
-        totalPaidWithExtras += newMonthlyPayment + singlePaymentAmount
+        const totalPrincipal = regularPrincipal + extraPrincipal + singlePaymentAmount
+        const newBalance = Math.max(0, balance - totalPrincipal)
+
+        // Adjust if payment would overpay
+        const actualTotalPrincipal = balance - newBalance
+        const totalPaymentAmount = interestPayment + actualTotalPrincipal
+
+        const paymentDate = new Date(startDate)
+        paymentDate.setMonth(paymentDate.getMonth() + month)
+
+        schedule.push({
+          month: month + 1,
+          date: paymentDate,
+          payment: monthlyPayment,
+          principal: regularPrincipal,
+          interest: interestPayment,
+          extraPayment: month < numberOfPayments ? mortgage.extraPayment : 0,
+          singlePayment: singlePaymentAmount,
+          totalPayment: totalPaymentAmount,
+          balance: newBalance
+        })
+
+        balance = newBalance
+        totalPaidWithExtras += totalPaymentAmount
         month++
       }
 
@@ -305,7 +341,8 @@ export default function MortgageCalculator() {
       totalInterest,
       newMonthlyPayment,
       newTerm,
-      interestSaved
+      interestSaved,
+      schedule
     }
   }
 
@@ -583,6 +620,64 @@ export default function MortgageCalculator() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Payment Timeline Table */}
+                    {details.schedule && details.schedule.length > 0 && (
+                      <div className="mt-6 border-t pt-6">
+                        <Collapsible>
+                          <CollapsibleTrigger asChild>
+                            <Button variant="outline" className="w-full justify-between">
+                              <span className="font-semibold">View Payment Timeline ({details.schedule.length} months)</span>
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-4">
+                            <div className="rounded-md border">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-16">Month</TableHead>
+                                    <TableHead className="w-32">Date</TableHead>
+                                    <TableHead className="text-right">Payment</TableHead>
+                                    <TableHead className="text-right">Principal</TableHead>
+                                    <TableHead className="text-right">Interest</TableHead>
+                                    <TableHead className="text-right bg-blue-50 dark:bg-blue-950">Extra</TableHead>
+                                    <TableHead className="text-right bg-purple-50 dark:bg-purple-950">Single</TableHead>
+                                    <TableHead className="text-right font-semibold">Total</TableHead>
+                                    <TableHead className="text-right font-semibold">Balance</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {details.schedule.map((entry, index) => (
+                                    <TableRow key={index} className={index % 2 === 0 ? "bg-muted/30" : ""}>
+                                      <TableCell className="font-medium">{entry.month}</TableCell>
+                                      <TableCell className="text-sm">{format(entry.date, "MMM yyyy")}</TableCell>
+                                      <TableCell className="text-right text-sm">{formatCurrency(entry.payment)}</TableCell>
+                                      <TableCell className="text-right text-sm">{formatCurrency(entry.principal)}</TableCell>
+                                      <TableCell className="text-right text-sm">{formatCurrency(entry.interest)}</TableCell>
+                                      <TableCell className={cn(
+                                        "text-right text-sm font-medium",
+                                        entry.extraPayment > 0 && "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+                                      )}>
+                                        {entry.extraPayment > 0 ? formatCurrency(entry.extraPayment) : "-"}
+                                      </TableCell>
+                                      <TableCell className={cn(
+                                        "text-right text-sm font-medium",
+                                        entry.singlePayment > 0 && "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
+                                      )}>
+                                        {entry.singlePayment > 0 ? formatCurrency(entry.singlePayment) : "-"}
+                                      </TableCell>
+                                      <TableCell className="text-right font-semibold text-sm">{formatCurrency(entry.totalPayment)}</TableCell>
+                                      <TableCell className="text-right font-semibold text-sm">{formatCurrency(entry.balance)}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </div>
+                    )}
                   </CardContent>
                 )}
               </Card>
