@@ -267,6 +267,20 @@ export default function MortgageCalculator() {
     balance: number
   }
 
+  // Unified schedule entry interface
+  interface UnifiedScheduleEntry {
+    date: Date
+    mortgageId: string
+    mortgageName: string
+    payment: number
+    principal: number
+    interest: number
+    extraPayment: number
+    singlePayment: number
+    totalPayment: number
+    balance: number
+  }
+
   // Calculate mortgage details for a specific mortgage with full schedule
   const calculateMortgageDetails = (mortgage: Mortgage) => {
     const monthlyPayment = calculateMonthlyPayment(
@@ -357,6 +371,32 @@ export default function MortgageCalculator() {
       interestSaved,
       schedule
     }
+  }
+
+  // Generate unified timeline from all mortgages
+  const generateUnifiedTimeline = (): UnifiedScheduleEntry[] => {
+    const allEntries: UnifiedScheduleEntry[] = []
+
+    mortgages.forEach(mortgage => {
+      const details = calculateMortgageDetails(mortgage)
+      details.schedule.forEach(entry => {
+        allEntries.push({
+          date: entry.date,
+          mortgageId: mortgage.id,
+          mortgageName: mortgage.name,
+          payment: entry.payment,
+          principal: entry.principal,
+          interest: entry.interest,
+          extraPayment: entry.extraPayment,
+          singlePayment: entry.singlePayment,
+          totalPayment: entry.totalPayment,
+          balance: entry.balance
+        })
+      })
+    })
+
+    // Sort by date
+    return allEntries.sort((a, b) => a.date.getTime() - b.date.getTime())
   }
 
   // Calculate total mortgage amount for all mortgages
@@ -574,64 +614,6 @@ export default function MortgageCalculator() {
                         </div>
                       </div>
                     </div>
-
-                    {/* Payment Timeline Table */}
-                    {details.schedule && details.schedule.length > 0 && (
-                      <div className="mt-6 border-t pt-6">
-                        <Collapsible>
-                          <CollapsibleTrigger asChild>
-                            <Button variant="outline" className="w-full justify-between">
-                              <span className="font-semibold">View Payment Timeline ({details.schedule.length} months)</span>
-                              <ChevronDown className="h-4 w-4" />
-                            </Button>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent className="mt-4">
-                            <div className="rounded-md border">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="w-16">Month</TableHead>
-                                    <TableHead className="w-32">Date</TableHead>
-                                    <TableHead className="text-right">Payment</TableHead>
-                                    <TableHead className="text-right">Principal</TableHead>
-                                    <TableHead className="text-right">Interest</TableHead>
-                                    <TableHead className="text-right bg-blue-50 dark:bg-blue-950">Extra</TableHead>
-                                    <TableHead className="text-right bg-purple-50 dark:bg-purple-950">Single</TableHead>
-                                    <TableHead className="text-right font-semibold">Total</TableHead>
-                                    <TableHead className="text-right font-semibold">Balance</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {details.schedule.map((entry, index) => (
-                                    <TableRow key={index} className={index % 2 === 0 ? "bg-muted/30" : ""}>
-                                      <TableCell className="font-medium">{entry.month}</TableCell>
-                                      <TableCell className="text-sm">{format(entry.date, "MMM yyyy")}</TableCell>
-                                      <TableCell className="text-right text-sm">{formatCurrency(entry.payment)}</TableCell>
-                                      <TableCell className="text-right text-sm">{formatCurrency(entry.principal)}</TableCell>
-                                      <TableCell className="text-right text-sm">{formatCurrency(entry.interest)}</TableCell>
-                                      <TableCell className={cn(
-                                        "text-right text-sm font-medium",
-                                        entry.extraPayment > 0 && "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-                                      )}>
-                                        {entry.extraPayment > 0 ? formatCurrency(entry.extraPayment) : "-"}
-                                      </TableCell>
-                                      <TableCell className={cn(
-                                        "text-right text-sm font-medium",
-                                        entry.singlePayment > 0 && "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
-                                      )}>
-                                        {entry.singlePayment > 0 ? formatCurrency(entry.singlePayment) : "-"}
-                                      </TableCell>
-                                      <TableCell className="text-right font-semibold text-sm">{formatCurrency(entry.totalPayment)}</TableCell>
-                                      <TableCell className="text-right font-semibold text-sm">{formatCurrency(entry.balance)}</TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      </div>
-                    )}
                   </CardContent>
                 )}
               </Card>
@@ -655,6 +637,76 @@ export default function MortgageCalculator() {
         {/* Chart Section */}
         <div>
           <MortgageChart mortgages={mortgages} />
+        </div>
+
+        {/* Unified Payment Timeline Section */}
+        <div>
+          <h2 className="text-2xl font-bold mb-4">Payment Timeline</h2>
+          <Card>
+            <CardContent className="pt-6">
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between">
+                    <span className="font-semibold">
+                      View Complete Payment Timeline ({generateUnifiedTimeline().length} payments across all mortgages)
+                    </span>
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-32">Date</TableHead>
+                          <TableHead>Mortgage</TableHead>
+                          <TableHead className="text-right">Payment</TableHead>
+                          <TableHead className="text-right">Principal</TableHead>
+                          <TableHead className="text-right">Interest</TableHead>
+                          <TableHead className="text-right bg-blue-50 dark:bg-blue-950">Extra</TableHead>
+                          <TableHead className="text-right bg-purple-50 dark:bg-purple-950">Single</TableHead>
+                          <TableHead className="text-right font-semibold">Total</TableHead>
+                          <TableHead className="text-right font-semibold">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {generateUnifiedTimeline().map((entry, index) => (
+                          <TableRow
+                            key={`${entry.mortgageId}-${index}`}
+                            className={index % 2 === 0 ? "bg-muted/30" : ""}
+                          >
+                            <TableCell className="text-sm font-medium">{format(entry.date, "MMM yyyy")}</TableCell>
+                            <TableCell className="text-sm">
+                              <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
+                                {entry.mortgageName}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right text-sm">{formatCurrency(entry.payment)}</TableCell>
+                            <TableCell className="text-right text-sm">{formatCurrency(entry.principal)}</TableCell>
+                            <TableCell className="text-right text-sm">{formatCurrency(entry.interest)}</TableCell>
+                            <TableCell className={cn(
+                              "text-right text-sm font-medium",
+                              entry.extraPayment > 0 && "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+                            )}>
+                              {entry.extraPayment > 0 ? formatCurrency(entry.extraPayment) : "-"}
+                            </TableCell>
+                            <TableCell className={cn(
+                              "text-right text-sm font-medium",
+                              entry.singlePayment > 0 && "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
+                            )}>
+                              {entry.singlePayment > 0 ? formatCurrency(entry.singlePayment) : "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-sm">{formatCurrency(entry.totalPayment)}</TableCell>
+                            <TableCell className="text-right font-semibold text-sm">{formatCurrency(entry.balance)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Comparison Section */}
