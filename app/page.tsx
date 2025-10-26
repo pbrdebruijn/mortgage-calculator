@@ -13,6 +13,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -57,6 +58,11 @@ export default function MortgageCalculator() {
 
   const [activeTab, setActiveTab] = useState("summary")
   const [isCopied, setIsCopied] = useState(false)
+
+  // State for managing extra payments modal
+  const [editingMortgageId, setEditingMortgageId] = useState<string | null>(null)
+  const [draftSinglePayments, setDraftSinglePayments] = useState<SinglePayment[]>([])
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   // Load shared data from URL on initial load
   useEffect(() => {
@@ -106,50 +112,57 @@ export default function MortgageCalculator() {
     setMortgages([...updatedMortgages, newMortgage])
   }
 
-  // Add a single payment to a mortgage
-  const addSinglePayment = (mortgageId: string) => {
-    setMortgages(mortgages.map(mortgage => {
-      if (mortgage.id === mortgageId) {
-        const newPayment: SinglePayment = {
-          id: `payment-${Date.now()}`,
-          amount: 0,
-          date: new Date()
-        }
-        return {
-          ...mortgage,
-          singlePayments: [...mortgage.singlePayments, newPayment]
-        }
-      }
-      return mortgage
-    }))
+  // Open modal with current payments
+  const openPaymentsModal = (mortgageId: string) => {
+    const mortgage = mortgages.find(m => m.id === mortgageId)
+    if (mortgage) {
+      setEditingMortgageId(mortgageId)
+      // Create a deep copy of the payments for editing
+      setDraftSinglePayments(mortgage.singlePayments.map(p => ({ ...p, date: new Date(p.date) })))
+      setIsModalOpen(true)
+    }
   }
 
-  // Remove a single payment from a mortgage
-  const removeSinglePayment = (mortgageId: string, paymentId: string) => {
-    setMortgages(mortgages.map(mortgage => {
-      if (mortgage.id === mortgageId) {
-        return {
-          ...mortgage,
-          singlePayments: mortgage.singlePayments.filter(p => p.id !== paymentId)
-        }
-      }
-      return mortgage
-    }))
+  // Close modal and discard changes
+  const closePaymentsModal = () => {
+    setIsModalOpen(false)
+    setEditingMortgageId(null)
+    setDraftSinglePayments([])
   }
 
-  // Update a single payment
-  const updateSinglePayment = (mortgageId: string, paymentId: string, field: keyof SinglePayment, value: any) => {
-    setMortgages(mortgages.map(mortgage => {
-      if (mortgage.id === mortgageId) {
-        return {
-          ...mortgage,
-          singlePayments: mortgage.singlePayments.map(payment =>
-            payment.id === paymentId ? { ...payment, [field]: value } : payment
-          )
-        }
-      }
-      return mortgage
-    }))
+  // Save draft payments to the mortgage
+  const saveSinglePayments = () => {
+    if (editingMortgageId) {
+      setMortgages(mortgages.map(mortgage =>
+        mortgage.id === editingMortgageId
+          ? { ...mortgage, singlePayments: draftSinglePayments.map(p => ({ ...p })) }
+          : mortgage
+      ))
+      toast.success("Extra payments updated!")
+      closePaymentsModal()
+    }
+  }
+
+  // Add a draft single payment
+  const addDraftPayment = () => {
+    const newPayment: SinglePayment = {
+      id: `payment-${Date.now()}`,
+      amount: 0,
+      date: new Date()
+    }
+    setDraftSinglePayments([...draftSinglePayments, newPayment])
+  }
+
+  // Remove a draft single payment
+  const removeDraftPayment = (paymentId: string) => {
+    setDraftSinglePayments(draftSinglePayments.filter(p => p.id !== paymentId))
+  }
+
+  // Update a draft single payment
+  const updateDraftPayment = (paymentId: string, field: keyof SinglePayment, value: any) => {
+    setDraftSinglePayments(draftSinglePayments.map(payment =>
+      payment.id === paymentId ? { ...payment, [field]: value } : payment
+    ))
   }
 
   // Remove a mortgage
@@ -505,84 +518,25 @@ export default function MortgageCalculator() {
                         </div>
 
                         <div className="space-y-3 pt-4 border-t">
-                          <div className="flex items-center justify-between">
-                            <Label>Single Extra Payments</Label>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => addSinglePayment(mortgage.id)}
-                            >
-                              <Plus className="h-4 w-4 mr-1" />
-                              Add Payment
-                            </Button>
-                          </div>
-
-                          {mortgage.singlePayments.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No single payments added</p>
-                          ) : (
-                            <div className="space-y-3">
-                              {mortgage.singlePayments.map((payment) => (
-                                <Card key={payment.id} className="p-3">
-                                  <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                      <Label className="text-sm">Payment Amount</Label>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6"
-                                        onClick={() => removeSinglePayment(mortgage.id, payment.id)}
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                    <div className="relative">
-                                      <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                      <Input
-                                        type="number"
-                                        value={payment.amount || ''}
-                                        onChange={(e) => {
-                                          const value = e.target.value === '' ? 0 : Number(e.target.value)
-                                          updateSinglePayment(mortgage.id, payment.id, "amount", value)
-                                        }}
-                                        className="pl-9"
-                                        placeholder="0"
-                                      />
-                                    </div>
-                                    <div>
-                                      <Label className="text-sm mb-2 block">Payment Date</Label>
-                                      <Popover>
-                                        <PopoverTrigger asChild>
-                                          <Button
-                                            variant="outline"
-                                            className={cn(
-                                              "w-full justify-start text-left font-normal",
-                                              !payment.date && "text-muted-foreground"
-                                            )}
-                                          >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {payment.date ? format(payment.date, "PPP") : <span>Pick a date</span>}
-                                          </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                          <Calendar
-                                            mode="single"
-                                            selected={payment.date}
-                                            onSelect={(date) => {
-                                              if (date) {
-                                                updateSinglePayment(mortgage.id, payment.id, "date", date)
-                                              }
-                                            }}
-                                            initialFocus
-                                          />
-                                        </PopoverContent>
-                                      </Popover>
-                                    </div>
-                                  </div>
-                                </Card>
-                              ))}
-                            </div>
+                          <Label>Single Extra Payments</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => openPaymentsModal(mortgage.id)}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Manage Extra Payments
+                            {mortgage.singlePayments.length > 0 && (
+                              <span className="ml-2 px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full">
+                                {mortgage.singlePayments.length}
+                              </span>
+                            )}
+                          </Button>
+                          {mortgage.singlePayments.length > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Total: {formatCurrency(mortgage.singlePayments.reduce((sum, p) => sum + p.amount, 0))}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -723,6 +677,126 @@ export default function MortgageCalculator() {
           />
         </div>
       </div>
+
+      {/* Extra Payments Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manage Single Extra Payments</DialogTitle>
+            <DialogDescription>
+              Add one-time extra payments (bonus, tax refund, etc.) and see their impact when you save.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold">Payment Schedule</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addDraftPayment}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Payment
+              </Button>
+            </div>
+
+            {draftSinglePayments.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No extra payments added yet.</p>
+                <p className="text-sm mt-1">Click "Add Payment" to get started.</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                {draftSinglePayments.map((payment, index) => (
+                  <Card key={payment.id} className="p-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-semibold">Payment #{index + 1}</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => removeDraftPayment(payment.id)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-sm">Amount</Label>
+                          <div className="relative mt-1">
+                            <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              value={payment.amount || ''}
+                              onChange={(e) => {
+                                const value = e.target.value === '' ? 0 : Number(e.target.value)
+                                updateDraftPayment(payment.id, "amount", value)
+                              }}
+                              className="pl-9"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-sm">Payment Date</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal mt-1",
+                                  !payment.date && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {payment.date ? format(payment.date, "PP") : <span>Pick date</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={payment.date}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    updateDraftPayment(payment.id, "date", date)
+                                  }
+                                }}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {draftSinglePayments.length > 0 && (
+              <div className="flex items-center justify-between pt-3 border-t">
+                <Label className="text-sm font-semibold">Total Extra Payments:</Label>
+                <span className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                  {formatCurrency(draftSinglePayments.reduce((sum, p) => sum + p.amount, 0))}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closePaymentsModal}>
+              Cancel
+            </Button>
+            <Button onClick={saveSinglePayments} className="bg-purple-600 hover:bg-purple-700">
+              Save & Recalculate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
