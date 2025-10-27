@@ -7,21 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChartTooltip } from "@/components/ui/chart"
 import { useLanguage } from "@/lib/i18n/language-context"
 
+// Import shared types and utilities
+import type { Mortgage } from "@/lib/types/mortgage"
+import { calculateMonthlyPayment, calculateSinglePaymentsByMonth } from "@/lib/calculations/mortgageCalculations"
+import { formatCurrency as formatCurrencyUtil } from "@/lib/formatting/formatters"
+
 interface MortgageChartProps {
-  mortgages: Array<{
-    id: string
-    name: string
-    amount: number
-    interestRate: number
-    term: number
-    extraPayment: number
-    startDate: Date
-    singlePayments: Array<{
-      id: string
-      date: string
-      amount: number
-    }>
-  }>
+  mortgages: Mortgage[]
 }
 
 interface ChartDataPoint {
@@ -50,29 +42,15 @@ export function MortgageChart({ mortgages = [] }: MortgageChartProps) {
       ...Object.fromEntries(mortgages.map(m => [m.id, 0]))
     }))
 
-    // Calculate balance over time for each mortgage
+    // Calculate balance over time for each mortgage using shared utilities
     mortgages.forEach(mortgage => {
       const monthlyRate = mortgage.interestRate / 100 / 12
       const numberOfPayments = mortgage.term * 12
-      const monthlyPayment = mortgage.amount > 0 && mortgage.interestRate > 0 ?
-        (mortgage.amount * monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) /
-        (Math.pow(1 + monthlyRate, numberOfPayments) - 1) : 0
+      const monthlyPayment = calculateMonthlyPayment(mortgage.amount, mortgage.interestRate, mortgage.term)
 
-      // Create a map of month index to total single payment amount for that month
+      // Use shared utility to calculate single payments map
       const startDate = new Date(mortgage.startDate.getFullYear(), mortgage.startDate.getMonth(), 1)
-      const singlePaymentsByMonth = new Map<number, number>()
-
-      mortgage.singlePayments.forEach(payment => {
-        if (payment.amount > 0) {
-          const paymentDate = new Date(payment.date)
-          const monthsDiff = (paymentDate.getFullYear() - startDate.getFullYear()) * 12 +
-                            (paymentDate.getMonth() - startDate.getMonth())
-          if (monthsDiff >= 0 && monthsDiff < numberOfPayments) {
-            const existing = singlePaymentsByMonth.get(monthsDiff) || 0
-            singlePaymentsByMonth.set(monthsDiff, existing + payment.amount)
-          }
-        }
-      })
+      const singlePaymentsByMonth = calculateSinglePaymentsByMonth(mortgage, startDate, numberOfPayments)
 
       let balance = mortgage.amount
       let monthIndex = 0
@@ -106,10 +84,8 @@ export function MortgageChart({ mortgages = [] }: MortgageChartProps) {
     setChartData(data)
   }, [mortgages])
 
-  // Format currency for tooltip
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(value)
-  }
+  // Use imported formatCurrency for tooltip
+  const formatCurrency = formatCurrencyUtil
 
   // Generate colors for each mortgage
   const getLineColor = (index: number) => {
