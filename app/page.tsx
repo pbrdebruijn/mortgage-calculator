@@ -1,21 +1,19 @@
 "use client"
 
 import { Calendar as CalendarIcon, Check, ChevronDown, ChevronRight, Euro, Plus, Share2, Trash, TrendingDown, X } from "lucide-react"
-import { useEffect, useState, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { format } from "date-fns"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
-import { toast } from "sonner"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LanguageSelector } from "@/components/language-selector"
 import { useLanguage } from "@/lib/i18n/language-context"
@@ -24,259 +22,51 @@ import { MortgageComparison } from "./mortgage-comparison"
 import { MortgageSummary } from "./mortgage-summary"
 import { MortgageTotalOverview } from "./mortgage-total-overview"
 
-// Define single payment type
-interface SinglePayment {
-  id: string
-  amount: number
-  date: Date
-}
+// Import shared types
+import type { Mortgage, SinglePayment } from "@/lib/types/mortgage"
 
-// Define mortgage type
-interface Mortgage {
-  id: string
-  name: string
-  amount: number
-  interestRate: number
-  term: number
-  extraPayment: number
-  startDate: Date
-  singlePayments: SinglePayment[]
-  isExpanded?: boolean
-}
+// Import utilities
+import { calculateMortgageDetails } from "@/lib/calculations/mortgageCalculations"
+import { formatCurrency, formatNumber } from "@/lib/formatting/formatters"
+import { useMortgageState } from "@/hooks/useMortgageState"
 
 export default function MortgageCalculator() {
   const { t } = useLanguage()
 
-  // State for multiple mortgages
-  const [mortgages, setMortgages] = useState<Mortgage[]>([
-    {
-      id: "mortgage-1",
-      name: "Primary Mortgage",
-      amount: 300000,
-      interestRate: 3.5,
-      term: 30,
-      extraPayment: 200,
-      startDate: new Date(),
-      singlePayments: [],
-      isExpanded: true,
-    },
-  ])
+  // Use custom hook for all mortgage state management
+  const {
+    mortgages,
+    isModalOpen,
+    draftSinglePayments,
+    addMortgage,
+    removeMortgage,
+    updateMortgage,
+    toggleMortgageExpansion,
+    handleNumberChange,
+    openPaymentsModal,
+    closePaymentsModal,
+    saveSinglePayments,
+    addDraftPayment,
+    removeDraftPayment,
+    updateDraftPayment,
+    shareMortgages,
+  } = useMortgageState()
 
-  const [activeTab, setActiveTab] = useState("summary")
+  // Local UI state
   const [isCopied, setIsCopied] = useState(false)
-
-  // State for managing extra payments modal
-  const [editingMortgageId, setEditingMortgageId] = useState<string | null>(null)
-  const [draftSinglePayments, setDraftSinglePayments] = useState<SinglePayment[]>([])
-  const [isModalOpen, setIsModalOpen] = useState(false)
-
-  // State for tracking timeline visibility
   const [isTimelineOpen, setIsTimelineOpen] = useState(false)
 
-  // Load shared data from URL on initial load
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const sharedData = params.get('data')
-
-    if (sharedData) {
-      try {
-        const decodedData = JSON.parse(atob(sharedData))
-        if (Array.isArray(decodedData) && decodedData.length > 0) {
-          // Ensure each mortgage has an ID and convert date strings back to Date objects
-          const mortgagesWithIds = decodedData.map((mortgage, index) => ({
-            ...mortgage,
-            id: mortgage.id || `mortgage-${index + 1}`,
-            startDate: mortgage.startDate ? new Date(mortgage.startDate) : new Date(),
-            singlePayments: (mortgage.singlePayments || []).map((p: any) => ({
-              ...p,
-              date: new Date(p.date)
-            })),
-            isExpanded: index === 0 // Expand only the first mortgage
-          }))
-          setMortgages(mortgagesWithIds)
-          toast.success("Shared mortgage data loaded!")
-        }
-      } catch (error) {
-        console.error('Error loading shared data:', error)
-        toast.error("Failed to load shared data")
-      }
-    }
-  }, [])
-
-  // Add a new mortgage
-  const addMortgage = () => {
-    const newId = `mortgage-${mortgages.length + 1}`
-    const newMortgage: Mortgage = {
-      id: newId,
-      name: `Mortgage ${mortgages.length + 1}`,
-      amount: 200000,
-      interestRate: 3.5,
-      term: 30,
-      extraPayment: 100,
-      startDate: new Date(),
-      singlePayments: [],
-      isExpanded: true,
-    }
-
-    // Collapse all other mortgages
-    const updatedMortgages = mortgages.map(m => ({ ...m, isExpanded: false }))
-    setMortgages([...updatedMortgages, newMortgage])
-  }
-
-  // Open modal with current payments
-  const openPaymentsModal = (mortgageId: string) => {
-    const mortgage = mortgages.find(m => m.id === mortgageId)
-    if (mortgage) {
-      setEditingMortgageId(mortgageId)
-      // Create a deep copy of the payments for editing
-      setDraftSinglePayments(mortgage.singlePayments.map(p => ({ ...p, date: new Date(p.date) })))
-      setIsModalOpen(true)
-    }
-  }
-
-  // Close modal and discard changes
-  const closePaymentsModal = () => {
-    setIsModalOpen(false)
-    setEditingMortgageId(null)
-    setDraftSinglePayments([])
-  }
-
-  // Save draft payments to the mortgage
-  const saveSinglePayments = () => {
-    if (editingMortgageId) {
-      setMortgages(mortgages.map(mortgage =>
-        mortgage.id === editingMortgageId
-          ? { ...mortgage, singlePayments: draftSinglePayments.map(p => ({ ...p })) }
-          : mortgage
-      ))
-      toast.success("Extra payments updated!")
-      closePaymentsModal()
-    }
-  }
-
-  // Add a draft single payment
-  const addDraftPayment = () => {
-    const newPayment: SinglePayment = {
-      id: `payment-${Date.now()}`,
-      amount: 0,
-      date: new Date()
-    }
-    setDraftSinglePayments([...draftSinglePayments, newPayment])
-  }
-
-  // Remove a draft single payment
-  const removeDraftPayment = (paymentId: string) => {
-    setDraftSinglePayments(draftSinglePayments.filter(p => p.id !== paymentId))
-  }
-
-  // Update a draft single payment
-  const updateDraftPayment = (paymentId: string, field: keyof SinglePayment, value: any) => {
-    setDraftSinglePayments(draftSinglePayments.map(payment =>
-      payment.id === paymentId ? { ...payment, [field]: value } : payment
-    ))
-  }
-
-  // Remove a mortgage
-  const removeMortgage = (id: string) => {
-    if (mortgages.length <= 1) return // Don't remove the last mortgage
-
-    const newMortgages = mortgages.filter((m) => m.id !== id)
-    setMortgages(newMortgages)
-  }
-
-  // Update mortgage details
-  const updateMortgage = (id: string, field: keyof Mortgage, value: any) => {
-    setMortgages(mortgages.map((mortgage) => (mortgage.id === id ? { ...mortgage, [field]: value } : mortgage)))
-  }
-
-  // Toggle mortgage expansion
-  const toggleMortgageExpansion = (id: string) => {
-    setMortgages(mortgages.map(mortgage =>
-      mortgage.id === id
-        ? { ...mortgage, isExpanded: !mortgage.isExpanded }
-        : mortgage
-    ))
-  }
-
-  // Handle number input changes
-  const handleNumberChange = (id: string, field: keyof Mortgage, value: string) => {
-    const numValue = value === '' ? 0 : Number(value)
-    updateMortgage(id, field, numValue)
-  }
-
-  // Share current mortgage data
-  const shareMortgages = () => {
-    const shareData = mortgages.map(mortgage => ({
-      id: mortgage.id,
-      name: mortgage.name,
-      amount: mortgage.amount,
-      interestRate: mortgage.interestRate,
-      term: mortgage.term,
-      extraPayment: mortgage.extraPayment,
-      startDate: mortgage.startDate.toISOString(),
-      singlePayments: mortgage.singlePayments.map(p => ({
-        id: p.id,
-        amount: p.amount,
-        date: p.date.toISOString()
-      }))
-    }))
-
-    const encodedData = btoa(JSON.stringify(shareData))
-    const shareUrl = `${window.location.origin}${window.location.pathname}?data=${encodedData}`
-
-    navigator.clipboard.writeText(shareUrl)
-      .then(() => {
+  // Handle share button with local state
+  const handleShare = () => {
+    shareMortgages(
+      () => {
         setIsCopied(true)
         setTimeout(() => setIsCopied(false), 2000)
-        toast.success("Share link copied to clipboard!")
-      })
-      .catch(() => {
-        toast.error("Failed to copy share link")
-      })
-  }
-
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    if (isNaN(amount) || amount === null) return "€0"
-    return new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(amount)
-  }
-
-  // Format number with fallback for NaN
-  const formatNumber = (value: number, decimals = 1) => {
-    if (isNaN(value) || value === null) return "0"
-    return value.toFixed(decimals)
-  }
-
-  // Calculate monthly payment
-  const calculateMonthlyPayment = (principal: number, rate: number, years: number) => {
-    if (isNaN(principal) || isNaN(rate) || isNaN(years) || principal <= 0 || rate <= 0 || years <= 0) {
-      return 0
-    }
-
-    const monthlyRate = rate / 100 / 12
-    const numberOfPayments = years * 12
-
-    if (monthlyRate === 0) {
-      return principal / numberOfPayments
-    }
-
-    return (
-      (principal * monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) /
-      (Math.pow(1 + monthlyRate, numberOfPayments) - 1)
+      },
+      () => {
+        // Error already handled in hook
+      }
     )
-  }
-
-  // Payment schedule entry interface
-  interface ScheduleEntry {
-    month: number
-    date: Date
-    payment: number
-    principal: number
-    interest: number
-    extraPayment: number
-    singlePayment: number
-    totalPayment: number
-    balance: number
   }
 
   // Unified schedule entry interface
@@ -291,100 +81,6 @@ export default function MortgageCalculator() {
     singlePayment: number
     totalPayment: number
     balance: number
-  }
-
-  // Calculate mortgage details for a specific mortgage (with optional schedule generation)
-  const calculateMortgageDetails = (mortgage: Mortgage, includeSchedule: boolean = false) => {
-    const monthlyPayment = calculateMonthlyPayment(
-      mortgage.amount,
-      mortgage.interestRate,
-      mortgage.term,
-    )
-
-    const totalInterest = monthlyPayment * mortgage.term * 12 - mortgage.amount
-    const newMonthlyPayment = monthlyPayment + mortgage.extraPayment
-
-    // Calculate new term with extra payments and single payments
-    let newTerm = mortgage.term
-    let totalPaidWithExtras = 0
-    const schedule: ScheduleEntry[] = []
-
-    if (!isNaN(mortgage.amount) && !isNaN(mortgage.interestRate) &&
-      !isNaN(mortgage.term) && !isNaN(mortgage.extraPayment) &&
-      mortgage.amount > 0 && mortgage.interestRate > 0 &&
-      mortgage.term > 0 && mortgage.extraPayment >= 0) {
-
-      const monthlyRate = mortgage.interestRate / 100 / 12
-      const numberOfPayments = mortgage.term * 12
-      let balance = mortgage.amount
-      let month = 0
-
-      // Calculate the month when each single payment should be applied
-      const startDate = new Date(mortgage.startDate.getFullYear(), mortgage.startDate.getMonth(), 1)
-
-      // Create a map of month index to total single payment amount for that month
-      const singlePaymentsByMonth = new Map<number, number>()
-      mortgage.singlePayments.forEach(payment => {
-        if (payment.amount > 0) {
-          const paymentDate = new Date(payment.date)
-          const monthsDiff = (paymentDate.getFullYear() - startDate.getFullYear()) * 12 +
-                            (paymentDate.getMonth() - startDate.getMonth())
-          if (monthsDiff >= 0 && monthsDiff < numberOfPayments) {
-            const existing = singlePaymentsByMonth.get(monthsDiff) || 0
-            singlePaymentsByMonth.set(monthsDiff, existing + payment.amount)
-          }
-        }
-      })
-
-      while (balance > 0 && month < numberOfPayments) {
-        const interestPayment = balance * monthlyRate
-        const regularPrincipal = monthlyPayment - interestPayment
-        const extraPrincipal = mortgage.extraPayment
-        const singlePaymentAmount = singlePaymentsByMonth.get(month) || 0
-
-        const totalPrincipal = regularPrincipal + extraPrincipal + singlePaymentAmount
-        const newBalance = Math.max(0, balance - totalPrincipal)
-
-        // Adjust if payment would overpay
-        const actualTotalPrincipal = balance - newBalance
-        const totalPaymentAmount = interestPayment + actualTotalPrincipal
-
-        // Only generate schedule if requested
-        if (includeSchedule) {
-          const paymentDate = new Date(startDate)
-          paymentDate.setMonth(paymentDate.getMonth() + month)
-
-          schedule.push({
-            month: month + 1,
-            date: paymentDate,
-            payment: monthlyPayment,
-            principal: regularPrincipal,
-            interest: interestPayment,
-            extraPayment: month < numberOfPayments ? mortgage.extraPayment : 0,
-            singlePayment: singlePaymentAmount,
-            totalPayment: totalPaymentAmount,
-            balance: newBalance
-          })
-        }
-
-        balance = newBalance
-        totalPaidWithExtras += totalPaymentAmount
-        month++
-      }
-
-      newTerm = month / 12
-    }
-
-    const interestSaved = totalInterest - (totalPaidWithExtras - mortgage.amount)
-
-    return {
-      monthlyPayment,
-      totalInterest,
-      newMonthlyPayment,
-      newTerm,
-      interestSaved,
-      schedule
-    }
   }
 
   // Generate unified timeline from all mortgages (memoized and only when timeline is open)
@@ -436,7 +132,7 @@ export default function MortgageCalculator() {
           <LanguageSelector />
           <ThemeToggle />
           <Button
-            onClick={shareMortgages}
+            onClick={handleShare}
             variant={isCopied ? "default" : "outline"}
             size="sm"
             className={cn(
@@ -689,11 +385,7 @@ export default function MortgageCalculator() {
         {/* Summary Section */}
         <div>
           <h2 className="text-2xl font-bold mb-4">{t('summary')}</h2>
-          <MortgageSummary
-            mortgages={mortgages}
-            calculateMonthlyPayment={calculateMonthlyPayment}
-            formatCurrency={formatCurrency}
-          />
+          <MortgageSummary mortgages={mortgages} />
         </div>
 
         {/* Chart Section */}
@@ -774,26 +466,23 @@ export default function MortgageCalculator() {
         {/* Comparison Section */}
         <div>
           <h2 className="text-2xl font-bold mb-4">{t('comparison')}</h2>
-          <MortgageComparison
-            mortgages={mortgages}
-            calculateMonthlyPayment={calculateMonthlyPayment}
-            formatCurrency={formatCurrency}
-          />
+          <MortgageComparison mortgages={mortgages} />
         </div>
 
         {/* Total Overview Section */}
         <div>
           <h2 className="text-2xl font-bold mb-4">Total Overview</h2>
-          <MortgageTotalOverview
-            mortgages={mortgages}
-            calculateMonthlyPayment={calculateMonthlyPayment}
-            formatCurrency={formatCurrency}
-          />
+          <MortgageTotalOverview mortgages={mortgages} />
         </div>
       </div>
 
       {/* Extra Payments Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <Dialog
+        open={isModalOpen}
+        onOpenChange={(open) => {
+          if (!open) closePaymentsModal()
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t('manageSingleExtraPayments')}</DialogTitle>

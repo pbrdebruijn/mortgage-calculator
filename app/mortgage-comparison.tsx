@@ -4,87 +4,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { useLanguage } from "@/lib/i18n/language-context"
 
-interface Mortgage {
-  id: string
-  name: string
-  amount: number
-  interestRate: number
-  term: number
-  extraPayment: number
-  startDate: Date
-  singlePayments: Array<{
-    id: string
-    date: string
-    amount: number
-  }>
-}
+// Import shared types and utilities
+import type { Mortgage } from "@/lib/types/mortgage"
+import { calculateMonthlyPayment, calculateNewTermAndTotalPaid } from "@/lib/calculations/mortgageCalculations"
+import { formatCurrency } from "@/lib/formatting/formatters"
 
 interface MortgageComparisonProps {
   mortgages: Mortgage[]
-  calculateMonthlyPayment: (principal: number, rate: number, years: number) => number
-  formatCurrency: (amount: number) => string
 }
 
-export function MortgageComparison({
-  mortgages,
-  calculateMonthlyPayment,
-  formatCurrency,
-}: MortgageComparisonProps) {
+export function MortgageComparison({ mortgages }: MortgageComparisonProps) {
   const { t } = useLanguage()
-  // Calculate details for each mortgage
+
+  // Calculate details for each mortgage using shared utilities
   const mortgageDetails = mortgages.map((mortgage) => {
     const monthlyPayment = calculateMonthlyPayment(mortgage.amount, mortgage.interestRate, mortgage.term)
     const totalInterest = monthlyPayment * mortgage.term * 12 - mortgage.amount
     const newMonthlyPayment = monthlyPayment + mortgage.extraPayment
 
-    // Calculate new term with extra payment and single payments
-    const calculateNewTermAndTotalPaid = () => {
-      if (mortgage.amount <= 0 || mortgage.interestRate <= 0 || mortgage.term <= 0 || mortgage.extraPayment < 0) {
-        return { newTerm: mortgage.term, totalPaidWithExtras: mortgage.amount }
-      }
-
-      const monthlyRate = mortgage.interestRate / 100 / 12
-      const numberOfPayments = mortgage.term * 12
-      let balance = mortgage.amount
-      let month = 0
-      let totalPaidWithExtras = 0
-
-      // Create a map of month index to total single payment amount for that month
-      const startDate = new Date(mortgage.startDate.getFullYear(), mortgage.startDate.getMonth(), 1)
-      const singlePaymentsByMonth = new Map<number, number>()
-
-      mortgage.singlePayments.forEach(payment => {
-        if (payment.amount > 0) {
-          const paymentDate = new Date(payment.date)
-          const monthsDiff = (paymentDate.getFullYear() - startDate.getFullYear()) * 12 +
-                            (paymentDate.getMonth() - startDate.getMonth())
-          if (monthsDiff >= 0 && monthsDiff < numberOfPayments) {
-            const existing = singlePaymentsByMonth.get(monthsDiff) || 0
-            singlePaymentsByMonth.set(monthsDiff, existing + payment.amount)
-          }
-        }
-      })
-
-      while (balance > 0 && month < numberOfPayments) {
-        const interestPayment = balance * monthlyRate
-        const regularPrincipal = newMonthlyPayment - interestPayment
-        const singlePaymentAmount = singlePaymentsByMonth.get(month) || 0
-        const totalPrincipal = regularPrincipal + singlePaymentAmount
-        const newBalance = Math.max(0, balance - totalPrincipal)
-
-        // Accumulate actual total paid (interest + actual principal paid)
-        const actualTotalPrincipal = balance - newBalance
-        const totalPaymentAmount = interestPayment + actualTotalPrincipal
-        totalPaidWithExtras += totalPaymentAmount
-
-        balance = newBalance
-        month++
-      }
-
-      return { newTerm: month / 12, totalPaidWithExtras }
-    }
-
-    const { newTerm, totalPaidWithExtras } = calculateNewTermAndTotalPaid()
+    // Use shared calculation utility
+    const { newTerm, totalPaidWithExtras } = calculateNewTermAndTotalPaid(mortgage, monthlyPayment)
 
     // Calculate interest saved using exact total paid
     const interestSaved = totalInterest - (totalPaidWithExtras - mortgage.amount)

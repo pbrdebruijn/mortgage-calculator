@@ -5,91 +5,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Doughnut } from "react-chartjs-2"
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js"
 
+// Import shared types and utilities
+import type { Mortgage } from "@/lib/types/mortgage"
+import { calculateMonthlyPayment, calculateNewTermAndTotalPaid } from "@/lib/calculations/mortgageCalculations"
+import { formatCurrency } from "@/lib/formatting/formatters"
+
 // Register Chart.js components
 ChartJS.register(ArcElement, Tooltip, Legend)
 
-interface Mortgage {
-  id: string
-  name: string
-  amount: number
-  interestRate: number
-  term: number
-  extraPayment: number
-  startDate: Date
-  singlePayments: Array<{
-    id: string
-    date: Date
-    amount: number
-  }>
-}
-
 interface MortgageTotalOverviewProps {
   mortgages: Mortgage[]
-  calculateMonthlyPayment: (principal: number, rate: number, years: number) => number
-  formatCurrency: (amount: number) => string
 }
 
-export function MortgageTotalOverview({
-  mortgages,
-  calculateMonthlyPayment,
-  formatCurrency,
-}: MortgageTotalOverviewProps) {
+export function MortgageTotalOverview({ mortgages }: MortgageTotalOverviewProps) {
   // Calculate total mortgage amount
   const totalMortgageAmount = mortgages.reduce((sum, mortgage) => sum + mortgage.amount, 0)
 
-  // Calculate mortgage details for each mortgage
+  // Calculate mortgage details for each mortgage using shared utilities
   const mortgageDetails = mortgages.map((mortgage) => {
     const monthlyPayment = calculateMonthlyPayment(mortgage.amount, mortgage.interestRate, mortgage.term)
-
     const totalInterest = monthlyPayment * mortgage.term * 12 - mortgage.amount
-
-    // Calculate new monthly payment with extra payment
     const newMonthlyPayment = monthlyPayment + mortgage.extraPayment
 
-    // Calculate new mortgage term with extra payment and single payments
-    const calculateNewTermAndTotalPaid = () => {
-      const monthlyRate = mortgage.interestRate / 100 / 12
-      const numberOfPayments = mortgage.term * 12
-      let balance = mortgage.amount
-      let month = 0
-      let totalPaidWithExtras = 0
-
-      // Create a map of month index to total single payment amount for that month
-      const startDate = new Date(mortgage.startDate.getFullYear(), mortgage.startDate.getMonth(), 1)
-      const singlePaymentsByMonth = new Map<number, number>()
-
-      mortgage.singlePayments.forEach(payment => {
-        if (payment.amount > 0) {
-          const paymentDate = new Date(payment.date)
-          const monthsDiff = (paymentDate.getFullYear() - startDate.getFullYear()) * 12 +
-                            (paymentDate.getMonth() - startDate.getMonth())
-          if (monthsDiff >= 0 && monthsDiff < numberOfPayments) {
-            const existing = singlePaymentsByMonth.get(monthsDiff) || 0
-            singlePaymentsByMonth.set(monthsDiff, existing + payment.amount)
-          }
-        }
-      })
-
-      while (balance > 0 && month < numberOfPayments) {
-        const interestPayment = balance * monthlyRate
-        const regularPrincipal = newMonthlyPayment - interestPayment
-        const singlePaymentAmount = singlePaymentsByMonth.get(month) || 0
-        const totalPrincipal = regularPrincipal + singlePaymentAmount
-        const newBalance = Math.max(0, balance - totalPrincipal)
-
-        // Accumulate actual total paid (interest + actual principal paid)
-        const actualTotalPrincipal = balance - newBalance
-        const totalPaymentAmount = interestPayment + actualTotalPrincipal
-        totalPaidWithExtras += totalPaymentAmount
-
-        balance = newBalance
-        month++
-      }
-
-      return { newTerm: month / 12, totalPaidWithExtras }
-    }
-
-    const { newTerm, totalPaidWithExtras } = calculateNewTermAndTotalPaid()
+    // Use shared calculation utility
+    const { newTerm, totalPaidWithExtras } = calculateNewTermAndTotalPaid(mortgage, monthlyPayment)
 
     // Calculate interest saved using exact total paid
     const newTotalInterest = totalPaidWithExtras - mortgage.amount
