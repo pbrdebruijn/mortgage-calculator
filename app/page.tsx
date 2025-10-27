@@ -241,7 +241,6 @@ export default function MortgageCalculator() {
                             <SelectContent>
                               <SelectItem value="annuity">{t('mortgageTypeAnnuity')}</SelectItem>
                               <SelectItem value="linear">{t('mortgageTypeLinear')}</SelectItem>
-                              <SelectItem value="aflossingsvrij">{t('mortgageTypeAflossingsvrij')}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

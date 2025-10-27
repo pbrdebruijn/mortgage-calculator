@@ -2,7 +2,7 @@
  * Shared type definitions for mortgage calculations
  */
 
-export type MortgageType = 'annuity' | 'linear' | 'aflossingsvrij'
+export type MortgageType = 'annuity' | 'linear'
 
 export interface SinglePayment {
   id: string

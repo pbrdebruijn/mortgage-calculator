@@ -30,7 +30,6 @@ export const nl = {
   // Mortgage types
   mortgageTypeAnnuity: "Annuïtair",
   mortgageTypeLinear: "Lineair",
-  mortgageTypeAflossingsvrij: "Aflossingsvrij",
 
   // Payment info
   regularMonthlyPayment: "Reguliere Maandlast",

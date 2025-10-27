@@ -11,8 +11,8 @@ import type { Mortgage, ScheduleEntry, MortgageDetails, MortgageCalculationResul
  * @param principal - The loan amount
  * @param rate - Annual interest rate (as percentage, e.g., 3.5 for 3.5%)
  * @param years - Loan term in years
- * @param type - Mortgage type (annuity, linear, or aflossingsvrij)
- * @returns Monthly payment amount (for linear and aflossingsvrij, this is the initial/average payment)
+ * @param type - Mortgage type (annuity or linear)
+ * @returns Monthly payment amount (for linear, this is the initial payment)
  */
 export function calculateMonthlyPayment(
   principal: number,
@@ -39,11 +39,6 @@ export function calculateMonthlyPayment(
     const monthlyPrincipal = principal / numberOfPayments
     const initialInterest = principal * monthlyRate
     return monthlyPrincipal + initialInterest
-  }
-
-  if (type === 'aflossingsvrij') {
-    // For interest-only: only interest is paid
-    return principal * monthlyRate
   }
 
   // Annuity mortgage (default)
@@ -122,9 +117,6 @@ export function calculateMortgageDetails(
     const monthlyPrincipal = mortgage.amount / numberOfPayments
     // Total interest for linear mortgage
     totalInterest = (mortgage.amount * monthlyRate * (numberOfPayments + 1)) / 2
-  } else if (mortgage.type === 'aflossingsvrij') {
-    // For interest-only: total interest = principal * rate * years
-    totalInterest = mortgage.amount * (mortgage.interestRate / 100) * mortgage.term
   } else {
     // For annuity: use standard calculation
     totalInterest = monthlyPayment * mortgage.term * 12 - mortgage.amount
@@ -176,10 +168,6 @@ export function calculateMortgageDetails(
         // Linear: fixed principal payment
         regularPrincipal = mortgage.amount / numberOfPayments
         currentMonthlyPayment = regularPrincipal + interestPayment
-      } else if (mortgage.type === 'aflossingsvrij') {
-        // Aflossingsvrij: no principal payment in regular payment
-        regularPrincipal = 0
-        currentMonthlyPayment = interestPayment
       } else {
         // Annuity: calculated principal
         regularPrincipal = monthlyPayment - interestPayment
@@ -289,9 +277,6 @@ export function calculateNewTermAndTotalPaid(
       if (mortgage.type === 'linear') {
         // Linear: fixed principal payment
         regularPrincipal = mortgage.amount / numberOfPayments
-      } else if (mortgage.type === 'aflossingsvrij') {
-        // Aflossingsvrij: no principal payment in regular payment
-        regularPrincipal = 0
       } else {
         // Annuity: calculated principal
         regularPrincipal = monthlyPayment - interestPayment

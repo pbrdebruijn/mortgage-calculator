@@ -30,7 +30,6 @@ export const en = {
   // Mortgage types
   mortgageTypeAnnuity: "Annuity (Annuïtair)",
   mortgageTypeLinear: "Linear (Lineair)",
-  mortgageTypeAflossingsvrij: "Interest-only (Aflossingsvrij)",
 
   // Payment info
   regularMonthlyPayment: "Regular Monthly Payment",
