@@ -15,6 +15,7 @@ interface Mortgage {
   interestRate: number
   term: number
   extraPayment: number
+  startDate: Date
 }
 
 interface MortgageTotalOverviewProps {

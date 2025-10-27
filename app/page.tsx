@@ -39,6 +39,7 @@ interface Mortgage {
   interestRate: number
   term: number
   extraPayment: number
+  startDate: Date
   singlePayments: SinglePayment[]
   isExpanded?: boolean
 }
@@ -55,6 +56,7 @@ export default function MortgageCalculator() {
       interestRate: 3.5,
       term: 30,
       extraPayment: 200,
+      startDate: new Date(),
       singlePayments: [],
       isExpanded: true,
     },
@@ -84,6 +86,7 @@ export default function MortgageCalculator() {
           const mortgagesWithIds = decodedData.map((mortgage, index) => ({
             ...mortgage,
             id: mortgage.id || `mortgage-${index + 1}`,
+            startDate: mortgage.startDate ? new Date(mortgage.startDate) : new Date(),
             singlePayments: (mortgage.singlePayments || []).map((p: any) => ({
               ...p,
               date: new Date(p.date)
@@ -110,6 +113,7 @@ export default function MortgageCalculator() {
       interestRate: 3.5,
       term: 30,
       extraPayment: 100,
+      startDate: new Date(),
       singlePayments: [],
       isExpanded: true,
     }
@@ -209,6 +213,7 @@ export default function MortgageCalculator() {
       interestRate: mortgage.interestRate,
       term: mortgage.term,
       extraPayment: mortgage.extraPayment,
+      startDate: mortgage.startDate.toISOString(),
       singlePayments: mortgage.singlePayments.map(p => ({
         id: p.id,
         amount: p.amount,
@@ -315,8 +320,7 @@ export default function MortgageCalculator() {
       let month = 0
 
       // Calculate the month when each single payment should be applied
-      const currentDate = new Date()
-      const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+      const startDate = new Date(mortgage.startDate.getFullYear(), mortgage.startDate.getMonth(), 1)
 
       // Create a map of month index to total single payment amount for that month
       const singlePaymentsByMonth = new Map<number, number>()
@@ -526,6 +530,37 @@ export default function MortgageCalculator() {
                             value={mortgage.name}
                             onChange={(e) => updateMortgage(mortgage.id, "name", e.target.value)}
                           />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor={`start-date-${mortgage.id}`}>{t('startDate')}</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                id={`start-date-${mortgage.id}`}
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !mortgage.startDate && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {mortgage.startDate ? format(mortgage.startDate, "PP") : <span>{t('pickDate')}</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={mortgage.startDate}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    updateMortgage(mortgage.id, "startDate", date)
+                                  }
+                                }}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
                         </div>
 
                         <div className="grid gap-3 grid-cols-2">

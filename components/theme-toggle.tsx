@@ -6,7 +6,7 @@ import { useTheme } from 'next-themes'
 import { Switch } from '@/components/ui/switch'
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
+  const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
   // Prevent hydration mismatch
@@ -24,7 +24,8 @@ export function ThemeToggle() {
     )
   }
 
-  const isDark = theme === 'dark'
+  // Use resolvedTheme to match the actual displayed theme (respects system preference)
+  const isDark = resolvedTheme === 'dark'
 
   return (
     <div className="flex items-center gap-2">

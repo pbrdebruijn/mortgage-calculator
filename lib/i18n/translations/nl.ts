@@ -17,6 +17,7 @@ export const nl = {
 
   // Form labels
   mortgageName: "Hypotheek Naam",
+  startDate: "Startdatum",
   mortgageAmount: "Hypotheekbedrag",
   interestRate: "Rentepercentage (%)",
   mortgageTerm: "Looptijd (jaren)",

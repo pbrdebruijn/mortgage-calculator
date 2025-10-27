@@ -15,6 +15,7 @@ interface MortgageChartProps {
     interestRate: number
     term: number
     extraPayment: number
+    startDate: Date
     singlePayments: Array<{
       id: string
       date: string
@@ -58,8 +59,7 @@ export function MortgageChart({ mortgages = [] }: MortgageChartProps) {
         (Math.pow(1 + monthlyRate, numberOfPayments) - 1) : 0
 
       // Create a map of month index to total single payment amount for that month
-      const currentDate = new Date()
-      const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+      const startDate = new Date(mortgage.startDate.getFullYear(), mortgage.startDate.getMonth(), 1)
       const singlePaymentsByMonth = new Map<number, number>()
 
       mortgage.singlePayments.forEach(payment => {

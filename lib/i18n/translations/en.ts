@@ -17,6 +17,7 @@ export const en = {
 
   // Form labels
   mortgageName: "Mortgage Name",
+  startDate: "Start Date",
   mortgageAmount: "Mortgage Amount",
   interestRate: "Interest Rate (%)",
   mortgageTerm: "Term (years)",
