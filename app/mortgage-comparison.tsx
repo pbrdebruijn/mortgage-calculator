@@ -2,6 +2,7 @@ import { ArrowRight } from "lucide-react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { useLanguage } from "@/lib/i18n/language-context"
 
 interface Mortgage {
   id: string
@@ -28,6 +29,7 @@ export function MortgageComparison({
   calculateMonthlyPayment,
   formatCurrency,
 }: MortgageComparisonProps) {
+  const { t } = useLanguage()
   // Calculate details for each mortgage
   const mortgageDetails = mortgages.map((mortgage) => {
     const monthlyPayment = calculateMonthlyPayment(mortgage.amount, mortgage.interestRate, mortgage.term)
@@ -147,31 +149,31 @@ export function MortgageComparison({
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Regular Payment Plan</CardTitle>
-            <CardDescription>Without extra payments</CardDescription>
+            <CardTitle>{t('regularPaymentPlan')}</CardTitle>
+            <CardDescription>{t('withoutExtraPayments')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <div>Monthly Payment</div>
+                <div>{t('monthlyPayment')}</div>
                 <div className="font-medium">{formatCurrency(monthlyPayment)}</div>
               </div>
               <div className="flex justify-between text-sm">
-                <div>Total Payments</div>
+                <div>{t('totalPayments')}</div>
                 <div className="font-medium">{formatCurrency(totalRegularPayments)}</div>
               </div>
               <div className="flex justify-between text-sm">
-                <div>Total Interest</div>
+                <div>{t('totalInterest')}</div>
                 <div className="font-medium">{formatCurrency(totalInterest)}</div>
               </div>
               <div className="flex justify-between text-sm">
-                <div>Mortgage Term</div>
-                <div className="font-medium">{mortgageTerm} years</div>
+                <div>{t('mortgageTerm')}</div>
+                <div className="font-medium">{mortgageTerm} {t('years')}</div>
               </div>
             </div>
 
             <div className="space-y-2">
-              <div className="text-sm font-medium">Payment Breakdown</div>
+              <div className="text-sm font-medium">{t('paymentBreakdown')}</div>
               <div className="flex h-4 items-center space-x-1 text-xs">
                 <div className="h-2 bg-primary rounded-l-full" style={{ width: `${regularPrincipalPercentage}%` }} />
                 <div className="h-2 bg-orange-500 rounded-r-full" style={{ width: `${regularInterestPercentage}%` }} />
@@ -179,11 +181,11 @@ export function MortgageComparison({
               <div className="flex justify-between">
                 <div className="flex items-center text-xs">
                   <div className="mr-1 h-2 w-2 rounded-full bg-primary" />
-                  <span>Principal ({regularPrincipalPercentage.toFixed(1)}%)</span>
+                  <span>{t('principal')} ({regularPrincipalPercentage.toFixed(1)}%)</span>
                 </div>
                 <div className="flex items-center text-xs">
                   <div className="mr-1 h-2 w-2 rounded-full bg-orange-500" />
-                  <span>Interest ({regularInterestPercentage.toFixed(1)}%)</span>
+                  <span>{t('interest')} ({regularInterestPercentage.toFixed(1)}%)</span>
                 </div>
               </div>
             </div>
@@ -192,12 +194,12 @@ export function MortgageComparison({
 
         <Card>
           <CardHeader>
-            <CardTitle>With Extra Payments</CardTitle>
+            <CardTitle>{t('withExtraPayments')}</CardTitle>
             <CardDescription>
-              {extraPayment > 0 && `${formatCurrency(extraPayment)} monthly`}
+              {extraPayment > 0 && `${formatCurrency(extraPayment)} ${t('monthly')}`}
               {extraPayment > 0 && totalSinglePayments > 0 && ' + '}
-              {totalSinglePayments > 0 && `${formatCurrency(totalSinglePayments)} lump-sum`}
-              {extraPayment === 0 && totalSinglePayments === 0 && 'No extra payments'}
+              {totalSinglePayments > 0 && `${formatCurrency(totalSinglePayments)} ${t('lumpSum')}`}
+              {extraPayment === 0 && totalSinglePayments === 0 && t('noExtraPayments')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">

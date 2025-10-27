@@ -17,6 +17,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { LanguageSelector } from "@/components/language-selector"
+import { useLanguage } from "@/lib/i18n/language-context"
 import { MortgageChart } from "./mortgage-chart"
 import { MortgageComparison } from "./mortgage-comparison"
 import { MortgageSummary } from "./mortgage-summary"
@@ -42,6 +44,8 @@ interface Mortgage {
 }
 
 export default function MortgageCalculator() {
+  const { t } = useLanguage()
+
   // State for multiple mortgages
   const [mortgages, setMortgages] = useState<Mortgage[]>([
     {
@@ -423,8 +427,9 @@ export default function MortgageCalculator() {
   return (
     <div className="container mx-auto py-10">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-center">Mortgage (Extra) Payment Calculator</h1>
+        <h1 className="text-3xl font-bold text-center">{t('title')}</h1>
         <div className="flex items-center gap-2">
+          <LanguageSelector />
           <ThemeToggle />
           <Button
             onClick={shareMortgages}
@@ -438,28 +443,28 @@ export default function MortgageCalculator() {
             {isCopied ? (
               <>
                 <Check className="mr-2 h-4 w-4 animate-in fade-in zoom-in" />
-                <span className="animate-in fade-in slide-in-from-left-2">Copied!</span>
+                <span className="animate-in fade-in slide-in-from-left-2">{t('copied')}</span>
               </>
             ) : (
               <>
                 <Share2 className="mr-2 h-4 w-4" />
-                <span>Share</span>
+                <span>{t('share')}</span>
               </>
             )}
           </Button>
         </div>
       </div>
       <p className="text-center text-muted-foreground mb-10">
-        See the impact of making extra payments on your annuity mortgage (annuïtaire hypotheek)
+        {t('description')}
       </p>
 
       {/* Mortgage Cards */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold mb-4">Your Mortgages</h2>
+          <h2 className="text-2xl font-bold mb-4">{t('yourMortgages')}</h2>
           <Button onClick={addMortgage} variant="outline" size="sm">
             <Plus className="mr-2 h-4 w-4" />
-            Add Mortgage
+            {t('addMortgage')}
           </Button>
         </div>
 
@@ -482,14 +487,14 @@ export default function MortgageCalculator() {
                     <div>
                       <h3 className="font-medium">{mortgage.name}</h3>
                       <p className="text-sm text-muted-foreground">
-                        {formatCurrency(mortgage.amount)} • {mortgage.interestRate}% • {mortgage.term} years
+                        {formatCurrency(mortgage.amount)} • {mortgage.interestRate}% • {mortgage.term} {t('years')}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {mortgage.isExpanded && (
                       <div className="text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground">{formatCurrency(details.monthlyPayment)}</span> / month
+                        <span className="font-medium text-foreground">{formatCurrency(details.monthlyPayment)}</span> / {t('month')}
                       </div>
                     )}
                     {mortgages.length > 1 && (
@@ -515,7 +520,7 @@ export default function MortgageCalculator() {
                       {/* Left Column: Form Inputs */}
                       <div className="space-y-3">
                         <div className="space-y-2">
-                          <Label htmlFor={`mortgage-name-${mortgage.id}`}>Mortgage Name</Label>
+                          <Label htmlFor={`mortgage-name-${mortgage.id}`}>{t('mortgageName')}</Label>
                           <Input
                             id={`mortgage-name-${mortgage.id}`}
                             value={mortgage.name}
@@ -525,7 +530,7 @@ export default function MortgageCalculator() {
 
                         <div className="grid gap-3 grid-cols-2">
                           <div className="space-y-2">
-                            <Label htmlFor={`mortgage-amount-${mortgage.id}`}>Mortgage Amount</Label>
+                            <Label htmlFor={`mortgage-amount-${mortgage.id}`}>{t('mortgageAmount')}</Label>
                             <div className="relative">
                               <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                               <Input
@@ -539,7 +544,7 @@ export default function MortgageCalculator() {
                           </div>
 
                           <div className="space-y-2">
-                            <Label htmlFor={`mortgage-term-${mortgage.id}`}>Term (years)</Label>
+                            <Label htmlFor={`mortgage-term-${mortgage.id}`}>{t('mortgageTerm')}</Label>
                             <Input
                               id={`mortgage-term-${mortgage.id}`}
                               type="number"
@@ -551,7 +556,7 @@ export default function MortgageCalculator() {
 
                         <div className="grid gap-3 grid-cols-2">
                           <div className="space-y-2">
-                            <Label htmlFor={`interest-rate-${mortgage.id}`}>Interest Rate (%)</Label>
+                            <Label htmlFor={`interest-rate-${mortgage.id}`}>{t('interestRate')}</Label>
                             <div className="relative">
                               <TrendingDown className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                               <Input
@@ -566,7 +571,7 @@ export default function MortgageCalculator() {
                           </div>
 
                           <div className="space-y-2">
-                            <Label htmlFor={`extra-payment-${mortgage.id}`}>Monthly Extra</Label>
+                            <Label htmlFor={`extra-payment-${mortgage.id}`}>{t('monthlyExtraPayment')}</Label>
                             <div className="relative">
                               <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                               <Input
@@ -581,7 +586,7 @@ export default function MortgageCalculator() {
                         </div>
 
                         <div className="space-y-2 pt-2 border-t">
-                          <Label>Single Extra Payments</Label>
+                          <Label>{t('singleExtraPayments')}</Label>
                           <Button
                             type="button"
                             variant="outline"
@@ -589,7 +594,7 @@ export default function MortgageCalculator() {
                             onClick={() => openPaymentsModal(mortgage.id)}
                           >
                             <Plus className="h-4 w-4 mr-2" />
-                            Manage Extra Payments
+                            {t('manageExtraPayments')}
                             {mortgage.singlePayments.length > 0 && (
                               <span className="ml-2 px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full">
                                 {mortgage.singlePayments.length}
@@ -598,7 +603,7 @@ export default function MortgageCalculator() {
                           </Button>
                           {mortgage.singlePayments.length > 0 && (
                             <p className="text-xs text-muted-foreground">
-                              Total: {formatCurrency(mortgage.singlePayments.reduce((sum, p) => sum + p.amount, 0))}
+                              {t('total')}: {formatCurrency(mortgage.singlePayments.reduce((sum, p) => sum + p.amount, 0))}
                             </p>
                           )}
                         </div>
@@ -607,31 +612,31 @@ export default function MortgageCalculator() {
                       {/* Right Column: Summary Stats */}
                       <div className="grid gap-4 grid-cols-2 content-start">
                         <div>
-                          <p className="text-xs font-medium text-muted-foreground">Regular Monthly Payment</p>
+                          <p className="text-xs font-medium text-muted-foreground">{t('regularMonthlyPayment')}</p>
                           <p className="text-xl font-bold mt-1">{formatCurrency(details.monthlyPayment)}</p>
                         </div>
 
                         <div>
-                          <p className="text-xs font-medium text-muted-foreground">With Extra Payment</p>
+                          <p className="text-xs font-medium text-muted-foreground">{t('withExtraPayment')}</p>
                           <p className="text-xl font-bold mt-1">{formatCurrency(details.newMonthlyPayment)}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {formatCurrency(mortgage.extraPayment)} extra
+                            {formatCurrency(mortgage.extraPayment)} {t('extra')}
                           </p>
                         </div>
 
                         <div>
-                          <p className="text-xs font-medium text-muted-foreground">Time Saved</p>
-                          <p className="text-xl font-bold mt-1">{formatNumber(mortgage.term - details.newTerm)} years</p>
+                          <p className="text-xs font-medium text-muted-foreground">{t('timeSaved')}</p>
+                          <p className="text-xl font-bold mt-1">{formatNumber(mortgage.term - details.newTerm)} {t('years')}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {formatNumber((mortgage.term - details.newTerm) * 12, 0)} months earlier
+                            {formatNumber((mortgage.term - details.newTerm) * 12, 0)} {t('months')} {t('earlier')}
                           </p>
                         </div>
 
                         <div>
-                          <p className="text-xs font-medium text-muted-foreground">Interest Saved</p>
+                          <p className="text-xs font-medium text-muted-foreground">{t('interestSaved')}</p>
                           <p className="text-xl font-bold text-green-600 mt-1">{formatCurrency(details.interestSaved)}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {formatNumber((details.interestSaved / details.totalInterest) * 100)}% of total
+                            {formatNumber((details.interestSaved / details.totalInterest) * 100)}% {t('ofTotal')}
                           </p>
                         </div>
                       </div>
@@ -648,7 +653,7 @@ export default function MortgageCalculator() {
       <div className="mt-10 space-y-10">
         {/* Summary Section */}
         <div>
-          <h2 className="text-2xl font-bold mb-4">Summary</h2>
+          <h2 className="text-2xl font-bold mb-4">{t('summary')}</h2>
           <MortgageSummary
             mortgages={mortgages}
             calculateMonthlyPayment={calculateMonthlyPayment}
@@ -663,14 +668,14 @@ export default function MortgageCalculator() {
 
         {/* Unified Payment Timeline Section */}
         <div>
-          <h2 className="text-2xl font-bold mb-4">Payment Timeline</h2>
+          <h2 className="text-2xl font-bold mb-4">{t('paymentTimeline')}</h2>
           <Card>
             <CardContent className="pt-6">
               <Collapsible open={isTimelineOpen} onOpenChange={setIsTimelineOpen}>
                 <CollapsibleTrigger asChild>
                   <Button variant="outline" className="w-full justify-between">
                     <span className="font-semibold">
-                      View Complete Payment Timeline ({totalPaymentCount} payments across all mortgages)
+                      {isTimelineOpen ? t('hideFullTimeline') : t('showFullTimeline')} ({t('totalPayments_count', { count: totalPaymentCount })})
                     </span>
                     <ChevronDown className="h-4 w-4" />
                   </Button>
@@ -680,15 +685,15 @@ export default function MortgageCalculator() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-32">Date</TableHead>
-                          <TableHead>Mortgage</TableHead>
-                          <TableHead className="text-right">Payment</TableHead>
-                          <TableHead className="text-right">Principal</TableHead>
-                          <TableHead className="text-right">Interest</TableHead>
-                          <TableHead className="text-right bg-blue-50 dark:bg-blue-950">Extra</TableHead>
-                          <TableHead className="text-right bg-purple-50 dark:bg-purple-950">Single</TableHead>
-                          <TableHead className="text-right font-semibold">Total</TableHead>
-                          <TableHead className="text-right font-semibold">Balance</TableHead>
+                          <TableHead className="w-32">{t('date')}</TableHead>
+                          <TableHead>{t('mortgageName')}</TableHead>
+                          <TableHead className="text-right">{t('payment')}</TableHead>
+                          <TableHead className="text-right">{t('principal')}</TableHead>
+                          <TableHead className="text-right">{t('interest')}</TableHead>
+                          <TableHead className="text-right bg-blue-50 dark:bg-blue-950">{t('extra')}</TableHead>
+                          <TableHead className="text-right bg-purple-50 dark:bg-purple-950">{t('single')}</TableHead>
+                          <TableHead className="text-right font-semibold">{t('total')}</TableHead>
+                          <TableHead className="text-right font-semibold">{t('balance')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -733,7 +738,7 @@ export default function MortgageCalculator() {
 
         {/* Comparison Section */}
         <div>
-          <h2 className="text-2xl font-bold mb-4">Comparison</h2>
+          <h2 className="text-2xl font-bold mb-4">{t('comparison')}</h2>
           <MortgageComparison
             mortgages={mortgages}
             calculateMonthlyPayment={calculateMonthlyPayment}
@@ -756,15 +761,15 @@ export default function MortgageCalculator() {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Manage Single Extra Payments</DialogTitle>
+            <DialogTitle>{t('manageSingleExtraPayments')}</DialogTitle>
             <DialogDescription>
-              Add one-time extra payments (bonus, tax refund, etc.) and see their impact when you save.
+              {t('addOnetimePayments')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="flex items-center justify-between">
-              <Label className="text-base font-semibold">Payment Schedule</Label>
+              <Label className="text-base font-semibold">{t('paymentSchedule')}</Label>
               <Button
                 type="button"
                 variant="outline"
@@ -772,14 +777,14 @@ export default function MortgageCalculator() {
                 onClick={addDraftPayment}
               >
                 <Plus className="h-4 w-4 mr-1" />
-                Add Payment
+                {t('addPayment')}
               </Button>
             </div>
 
             {draftSinglePayments.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <p>No extra payments added yet.</p>
-                <p className="text-sm mt-1">Click "Add Payment" to get started.</p>
+                <p>{t('noExtraPaymentsYet')}</p>
+                <p className="text-sm mt-1">{t('clickAddPayment')}</p>
               </div>
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
@@ -787,7 +792,7 @@ export default function MortgageCalculator() {
                   <Card key={payment.id} className="p-4">
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <Label className="text-sm font-semibold">Payment #{index + 1}</Label>
+                        <Label className="text-sm font-semibold">{t('paymentNumber', { number: index + 1 })}</Label>
                         <Button
                           type="button"
                           variant="ghost"
@@ -800,7 +805,7 @@ export default function MortgageCalculator() {
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <Label className="text-sm">Amount</Label>
+                          <Label className="text-sm">{t('amount')}</Label>
                           <div className="relative mt-1">
                             <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -816,7 +821,7 @@ export default function MortgageCalculator() {
                           </div>
                         </div>
                         <div>
-                          <Label className="text-sm">Payment Date</Label>
+                          <Label className="text-sm">{t('paymentDate')}</Label>
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button
@@ -827,7 +832,7 @@ export default function MortgageCalculator() {
                                 )}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {payment.date ? format(payment.date, "PP") : <span>Pick date</span>}
+                                {payment.date ? format(payment.date, "PP") : <span>{t('pickDate')}</span>}
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
@@ -853,7 +858,7 @@ export default function MortgageCalculator() {
 
             {draftSinglePayments.length > 0 && (
               <div className="flex items-center justify-between pt-3 border-t">
-                <Label className="text-sm font-semibold">Total Extra Payments:</Label>
+                <Label className="text-sm font-semibold">{t('totalExtraPayments')}</Label>
                 <span className="text-lg font-bold text-purple-600 dark:text-purple-400">
                   {formatCurrency(draftSinglePayments.reduce((sum, p) => sum + p.amount, 0))}
                 </span>
@@ -863,10 +868,10 @@ export default function MortgageCalculator() {
 
           <DialogFooter>
             <Button variant="outline" onClick={closePaymentsModal}>
-              Cancel
+              {t('cancel')}
             </Button>
             <Button onClick={saveSinglePayments} className="bg-purple-600 hover:bg-purple-700">
-              Save & Recalculate
+              {t('saveAndRecalculate')}
             </Button>
           </DialogFooter>
         </DialogContent>

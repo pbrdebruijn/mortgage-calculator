@@ -5,6 +5,7 @@ import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Legend } from "rech
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartTooltip } from "@/components/ui/chart"
+import { useLanguage } from "@/lib/i18n/language-context"
 
 interface MortgageChartProps {
   mortgages: Array<{
@@ -29,6 +30,7 @@ interface ChartDataPoint {
 }
 
 export function MortgageChart({ mortgages = [] }: MortgageChartProps) {
+  const { t } = useLanguage()
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
 
   useEffect(() => {
@@ -125,11 +127,11 @@ export function MortgageChart({ mortgages = [] }: MortgageChartProps) {
     return (
       <Card className="w-full">
         <CardHeader>
-          <CardTitle>Mortgage Balance Over Time</CardTitle>
-          <CardDescription>Add a mortgage to see the balance reduction over time</CardDescription>
+          <CardTitle>{t('mortgageBalanceOverTime')}</CardTitle>
+          <CardDescription>{t('addMortgageToSeeChart')}</CardDescription>
         </CardHeader>
         <CardContent className="h-[300px] flex items-center justify-center text-muted-foreground">
-          No mortgage data to display
+          {t('noMortgageData')}
         </CardContent>
       </Card>
     )
@@ -138,26 +140,26 @@ export function MortgageChart({ mortgages = [] }: MortgageChartProps) {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Mortgage Balance Over Time</CardTitle>
-        <CardDescription>Balance reduction including monthly and single extra payments</CardDescription>
+        <CardTitle>{t('mortgageBalanceOverTime')}</CardTitle>
+        <CardDescription>{t('balanceReductionDescription')}</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
           <LineChart data={chartData} margin={{ top: 0, right: 50, bottom: 20, left: 0 }}>
             <XAxis
               dataKey="year"
-              label={{ value: "Years", position: "insideBottom", offset: -15 }}
+              label={{ value: t('years'), position: "insideBottom", offset: -15 }}
               tick={{ fontSize: 12 }}
             />
             <YAxis
               tickFormatter={(value) => `€${Math.round(value / 1000)}k`}
-              label={{ value: "Balance", angle: -90, position: "insideLeft", offset: 15 }}
+              label={{ value: t('balance'), angle: -90, position: "insideLeft", offset: 15 }}
               tick={{ fontSize: 12 }}
               width={70}
             />
             <ChartTooltip
               formatter={(value: number) => formatCurrency(value)}
-              labelFormatter={(label: number) => `Year ${label}`}
+              labelFormatter={(label: number) => `${t('year')} ${label}`}
             />
             <Legend verticalAlign="top" height={36} />
             {/* Line for total balance - only show when there are multiple mortgages */}
@@ -168,7 +170,7 @@ export function MortgageChart({ mortgages = [] }: MortgageChartProps) {
                 stroke="hsl(var(--primary))"
                 strokeWidth={3}
                 dot={false}
-                name="Total Balance"
+                name={t('totalBalance')}
               />
             )}
             {/* Lines for individual mortgages */}
