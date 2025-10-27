@@ -11,12 +11,14 @@ import type { Mortgage, ScheduleEntry, MortgageDetails, MortgageCalculationResul
  * @param principal - The loan amount
  * @param rate - Annual interest rate (as percentage, e.g., 3.5 for 3.5%)
  * @param years - Loan term in years
- * @returns Monthly payment amount
+ * @param type - Mortgage type (annuity, linear, or aflossingsvrij)
+ * @returns Monthly payment amount (for linear and aflossingsvrij, this is the initial/average payment)
  */
 export function calculateMonthlyPayment(
   principal: number,
   rate: number,
-  years: number
+  years: number,
+  type: string = 'annuity'
 ): number {
   if (
     isNaN(principal) ||
@@ -32,6 +34,19 @@ export function calculateMonthlyPayment(
   const monthlyRate = rate / 100 / 12
   const numberOfPayments = years * 12
 
+  if (type === 'linear') {
+    // For linear: fixed principal + initial interest payment
+    const monthlyPrincipal = principal / numberOfPayments
+    const initialInterest = principal * monthlyRate
+    return monthlyPrincipal + initialInterest
+  }
+
+  if (type === 'aflossingsvrij') {
+    // For interest-only: only interest is paid
+    return principal * monthlyRate
+  }
+
+  // Annuity mortgage (default)
   if (monthlyRate === 0) {
     return principal / numberOfPayments
   }
@@ -94,7 +109,8 @@ export function calculateMortgageDetails(
   const monthlyPayment = calculateMonthlyPayment(
     mortgage.amount,
     mortgage.interestRate,
-    mortgage.term
+    mortgage.term,
+    mortgage.type
   )
 
   const totalInterest = monthlyPayment * mortgage.term * 12 - mortgage.amount
@@ -137,7 +153,23 @@ export function calculateMortgageDetails(
     // Amortization loop
     while (balance > 0 && month < numberOfPayments) {
       const interestPayment = balance * monthlyRate
-      const regularPrincipal = monthlyPayment - interestPayment
+      let regularPrincipal: number
+      let currentMonthlyPayment: number
+
+      if (mortgage.type === 'linear') {
+        // Linear: fixed principal payment
+        regularPrincipal = mortgage.amount / numberOfPayments
+        currentMonthlyPayment = regularPrincipal + interestPayment
+      } else if (mortgage.type === 'aflossingsvrij') {
+        // Aflossingsvrij: no principal payment in regular payment
+        regularPrincipal = 0
+        currentMonthlyPayment = interestPayment
+      } else {
+        // Annuity: calculated principal
+        regularPrincipal = monthlyPayment - interestPayment
+        currentMonthlyPayment = monthlyPayment
+      }
+
       const extraPrincipal = mortgage.extraPayment
       const singlePaymentAmount = singlePaymentsByMonth.get(month) || 0
 
@@ -156,7 +188,7 @@ export function calculateMortgageDetails(
         schedule.push({
           month: month + 1,
           date: paymentDate,
-          payment: monthlyPayment,
+          payment: currentMonthlyPayment,
           principal: regularPrincipal,
           interest: interestPayment,
           extraPayment: month < numberOfPayments ? mortgage.extraPayment : 0,
@@ -236,7 +268,19 @@ export function calculateNewTermAndTotalPaid(
     // Amortization loop
     while (balance > 0 && month < numberOfPayments) {
       const interestPayment = balance * monthlyRate
-      const regularPrincipal = monthlyPayment - interestPayment
+      let regularPrincipal: number
+
+      if (mortgage.type === 'linear') {
+        // Linear: fixed principal payment
+        regularPrincipal = mortgage.amount / numberOfPayments
+      } else if (mortgage.type === 'aflossingsvrij') {
+        // Aflossingsvrij: no principal payment in regular payment
+        regularPrincipal = 0
+      } else {
+        // Annuity: calculated principal
+        regularPrincipal = monthlyPayment - interestPayment
+      }
+
       const singlePaymentAmount = singlePaymentsByMonth.get(month) || 0
 
       const totalPrincipal = regularPrincipal + mortgage.extraPayment + singlePaymentAmount

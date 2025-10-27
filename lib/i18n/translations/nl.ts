@@ -17,6 +17,7 @@ export const nl = {
 
   // Form labels
   mortgageName: "Hypotheek Naam",
+  mortgageType: "Hypotheekvorm",
   startDate: "Startdatum",
   mortgageAmount: "Hypotheekbedrag",
   interestRate: "Rentepercentage (%)",
@@ -25,6 +26,11 @@ export const nl = {
   singleExtraPayments: "Eenmalige Extra Aflossingen",
   manageExtraPayments: "Beheer Extra Aflossingen",
   total: "Totaal",
+
+  // Mortgage types
+  mortgageTypeAnnuity: "Annuïtair",
+  mortgageTypeLinear: "Lineair",
+  mortgageTypeAflossingsvrij: "Aflossingsvrij",
 
   // Payment info
   regularMonthlyPayment: "Reguliere Maandlast",
