@@ -16,6 +16,11 @@ interface Mortgage {
   term: number
   extraPayment: number
   startDate: Date
+  singlePayments: Array<{
+    id: string
+    date: Date
+    amount: number
+  }>
 }
 
 interface MortgageTotalOverviewProps {
@@ -41,17 +46,35 @@ export function MortgageTotalOverview({
     // Calculate new monthly payment with extra payment
     const newMonthlyPayment = monthlyPayment + mortgage.extraPayment
 
-    // Calculate new mortgage term with extra payment (in months)
+    // Calculate new mortgage term with extra payment and single payments
     const calculateNewTerm = () => {
       const monthlyRate = mortgage.interestRate / 100 / 12
       const numberOfPayments = mortgage.term * 12
       let balance = mortgage.amount
       let month = 0
 
+      // Create a map of month index to total single payment amount for that month
+      const startDate = new Date(mortgage.startDate.getFullYear(), mortgage.startDate.getMonth(), 1)
+      const singlePaymentsByMonth = new Map<number, number>()
+
+      mortgage.singlePayments.forEach(payment => {
+        if (payment.amount > 0) {
+          const paymentDate = new Date(payment.date)
+          const monthsDiff = (paymentDate.getFullYear() - startDate.getFullYear()) * 12 +
+                            (paymentDate.getMonth() - startDate.getMonth())
+          if (monthsDiff >= 0 && monthsDiff < numberOfPayments) {
+            const existing = singlePaymentsByMonth.get(monthsDiff) || 0
+            singlePaymentsByMonth.set(monthsDiff, existing + payment.amount)
+          }
+        }
+      })
+
       while (balance > 0 && month < numberOfPayments) {
         const interestPayment = balance * monthlyRate
-        const principalPayment = newMonthlyPayment - interestPayment
-        balance -= principalPayment
+        const regularPrincipal = newMonthlyPayment - interestPayment
+        const singlePaymentAmount = singlePaymentsByMonth.get(month) || 0
+        const totalPrincipal = regularPrincipal + singlePaymentAmount
+        balance = Math.max(0, balance - totalPrincipal)
         month++
       }
 
