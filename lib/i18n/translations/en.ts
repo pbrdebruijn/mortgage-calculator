@@ -17,6 +17,7 @@ export const en = {
 
   // Form labels
   mortgageName: "Mortgage Name",
+  mortgageType: "Mortgage Type",
   startDate: "Start Date",
   mortgageAmount: "Mortgage Amount",
   interestRate: "Interest Rate (%)",
@@ -25,6 +26,10 @@ export const en = {
   singleExtraPayments: "Single Extra Payments",
   manageExtraPayments: "Manage Extra Payments",
   total: "Total",
+
+  // Mortgage types
+  mortgageTypeAnnuity: "Annuity (Annuïtair)",
+  mortgageTypeLinear: "Linear (Lineair)",
 
   // Payment info
   regularMonthlyPayment: "Regular Monthly Payment",

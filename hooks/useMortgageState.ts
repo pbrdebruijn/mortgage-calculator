@@ -21,6 +21,7 @@ export function useMortgageState() {
       amount: 300000,
       interestRate: 3.5,
       term: 30,
+      type: 'annuity',
       extraPayment: 200,
       startDate: new Date(),
       singlePayments: [],
@@ -46,6 +47,7 @@ export function useMortgageState() {
           const mortgagesWithIds = decodedData.map((mortgage, index) => ({
             ...mortgage,
             id: mortgage.id || `mortgage-${index + 1}`,
+            type: mortgage.type || 'annuity', // Default to annuity for backward compatibility
             startDate: mortgage.startDate ? new Date(mortgage.startDate) : new Date(),
             singlePayments: (mortgage.singlePayments || []).map((p: any) => ({
               ...p,
@@ -75,6 +77,7 @@ export function useMortgageState() {
       amount: 200000,
       interestRate: 3.5,
       term: 30,
+      type: 'annuity',
       extraPayment: 100,
       startDate: new Date(),
       singlePayments: [],
@@ -210,6 +213,7 @@ export function useMortgageState() {
       amount: mortgage.amount,
       interestRate: mortgage.interestRate,
       term: mortgage.term,
+      type: mortgage.type,
       extraPayment: mortgage.extraPayment,
       startDate: mortgage.startDate.toISOString(),
       singlePayments: mortgage.singlePayments.map((p) => ({

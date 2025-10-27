@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LanguageSelector } from "@/components/language-selector"
@@ -23,7 +24,7 @@ import { MortgageSummary } from "./mortgage-summary"
 import { MortgageTotalOverview } from "./mortgage-total-overview"
 
 // Import shared types
-import type { Mortgage, SinglePayment } from "@/lib/types/mortgage"
+import type { Mortgage, SinglePayment, MortgageType } from "@/lib/types/mortgage"
 
 // Import utilities
 import { calculateMortgageDetails } from "@/lib/calculations/mortgageCalculations"
@@ -226,6 +227,22 @@ export default function MortgageCalculator() {
                             value={mortgage.name}
                             onChange={(e) => updateMortgage(mortgage.id, "name", e.target.value)}
                           />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor={`mortgage-type-${mortgage.id}`}>{t('mortgageType')}</Label>
+                          <Select
+                            value={mortgage.type}
+                            onValueChange={(value) => updateMortgage(mortgage.id, "type", value as MortgageType)}
+                          >
+                            <SelectTrigger id={`mortgage-type-${mortgage.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="annuity">{t('mortgageTypeAnnuity')}</SelectItem>
+                              <SelectItem value="linear">{t('mortgageTypeLinear')}</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
 
                         <div className="space-y-2">

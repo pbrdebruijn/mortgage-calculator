@@ -2,6 +2,8 @@
  * Shared type definitions for mortgage calculations
  */
 
+export type MortgageType = 'annuity' | 'linear'
+
 export interface SinglePayment {
   id: string
   amount: number
@@ -14,6 +16,7 @@ export interface Mortgage {
   amount: number
   interestRate: number
   term: number
+  type: MortgageType
   extraPayment: number
   startDate: Date
   singlePayments: SinglePayment[]
