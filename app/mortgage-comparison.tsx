@@ -10,6 +10,11 @@ interface Mortgage {
   interestRate: number
   term: number
   extraPayment: number
+  singlePayments: Array<{
+    id: string
+    date: string
+    amount: number
+  }>
 }
 
 interface MortgageComparisonProps {
@@ -29,7 +34,7 @@ export function MortgageComparison({
     const totalInterest = monthlyPayment * mortgage.term * 12 - mortgage.amount
     const newMonthlyPayment = monthlyPayment + mortgage.extraPayment
 
-    // Calculate new term with extra payment
+    // Calculate new term with extra payment and single payments
     const calculateNewTerm = () => {
       if (mortgage.amount <= 0 || mortgage.interestRate <= 0 || mortgage.term <= 0 || mortgage.extraPayment < 0) {
         return mortgage.term
@@ -40,10 +45,29 @@ export function MortgageComparison({
       let balance = mortgage.amount
       let month = 0
 
+      // Create a map of month index to total single payment amount for that month
+      const currentDate = new Date()
+      const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+      const singlePaymentsByMonth = new Map<number, number>()
+
+      mortgage.singlePayments.forEach(payment => {
+        if (payment.amount > 0) {
+          const paymentDate = new Date(payment.date)
+          const monthsDiff = (paymentDate.getFullYear() - startDate.getFullYear()) * 12 +
+                            (paymentDate.getMonth() - startDate.getMonth())
+          if (monthsDiff >= 0 && monthsDiff < numberOfPayments) {
+            const existing = singlePaymentsByMonth.get(monthsDiff) || 0
+            singlePaymentsByMonth.set(monthsDiff, existing + payment.amount)
+          }
+        }
+      })
+
       while (balance > 0 && month < numberOfPayments) {
         const interestPayment = balance * monthlyRate
-        const principalPayment = newMonthlyPayment - interestPayment
-        balance -= principalPayment
+        const regularPrincipal = newMonthlyPayment - interestPayment
+        const singlePaymentAmount = singlePaymentsByMonth.get(month) || 0
+        const totalPrincipal = regularPrincipal + singlePaymentAmount
+        balance = Math.max(0, balance - totalPrincipal)
         month++
       }
 
@@ -91,9 +115,17 @@ export function MortgageComparison({
     return sum + (mortgages[index].extraPayment * detail.newTerm * 12)
   }, 0)
 
+  // Calculate total single payments across all mortgages
+  const totalSinglePayments = mortgages.reduce((sum, mortgage) => {
+    return sum + mortgage.singlePayments.reduce((paymentSum, payment) => paymentSum + payment.amount, 0)
+  }, 0)
+
+  // Calculate total of both monthly extra payments AND single payments
+  const totalAllExtraPayments = totalExtraPaymentsMade + totalSinglePayments
+
   // Calculate return on extra payments (guard against division by zero)
-  const returnOnExtraPayments = totalExtraPaymentsMade > 0
-    ? (interestSaved / totalExtraPaymentsMade) * 100
+  const returnOnExtraPayments = totalAllExtraPayments > 0
+    ? (interestSaved / totalAllExtraPayments) * 100
     : 0
 
   // Find the mortgage with the biggest time reduction for the key takeaway
@@ -161,7 +193,12 @@ export function MortgageComparison({
         <Card>
           <CardHeader>
             <CardTitle>With Extra Payments</CardTitle>
-            <CardDescription>Adding {formatCurrency(extraPayment)} monthly</CardDescription>
+            <CardDescription>
+              {extraPayment > 0 && `${formatCurrency(extraPayment)} monthly`}
+              {extraPayment > 0 && totalSinglePayments > 0 && ' + '}
+              {totalSinglePayments > 0 && `${formatCurrency(totalSinglePayments)} lump-sum`}
+              {extraPayment === 0 && totalSinglePayments === 0 && 'No extra payments'}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -250,7 +287,9 @@ export function MortgageComparison({
               Key Takeaway
             </div>
             <p className="text-sm text-muted-foreground">
-              By adding just {formatCurrency(extraPayment)} to your monthly payment, you'll save{" "}
+              By adding {extraPayment > 0 ? `${formatCurrency(extraPayment)} to your monthly payment` : 'extra payments'}
+              {totalSinglePayments > 0 && extraPayment > 0 && ' and '}
+              {totalSinglePayments > 0 && `${formatCurrency(totalSinglePayments)} in lump-sum payments`}, you'll save{" "}
               {formatCurrency(interestSaved)} in interest and pay off your mortgages{" "}
               {(mortgageTerm - newTerm).toFixed(1)} years earlier overall.
               {mortgageWithBiggestReduction && mortgageWithBiggestReduction.reduction > 0 && (
@@ -260,7 +299,7 @@ export function MortgageComparison({
                   {mortgageWithBiggestReduction.mortgage.term} years — essentially turning a {mortgageWithBiggestReduction.mortgage.term}-year loan into a {mortgageWithBiggestReduction.detail.newTerm.toFixed(1)}-year loan!
                 </>
               )}
-              {" "}This is a return of {returnOnExtraPayments.toFixed(1)}% on your extra payments.
+              {" "}This is a return of {returnOnExtraPayments.toFixed(1)}% on your {totalSinglePayments > 0 ? 'combined ' : ''}extra payments.
             </p>
           </div>
         </CardContent>

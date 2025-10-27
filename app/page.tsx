@@ -1,13 +1,19 @@
 "use client"
 
-import { Check, ChevronDown, ChevronRight, Euro, Plus, Share2, Trash, TrendingDown } from "lucide-react"
-import { useEffect, useState } from "react"
+import { Calendar as CalendarIcon, Check, ChevronDown, ChevronRight, Euro, Plus, Share2, Trash, TrendingDown, X } from "lucide-react"
+import { useEffect, useState, useMemo } from "react"
+import { format } from "date-fns"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -15,6 +21,13 @@ import { MortgageChart } from "./mortgage-chart"
 import { MortgageComparison } from "./mortgage-comparison"
 import { MortgageSummary } from "./mortgage-summary"
 import { MortgageTotalOverview } from "./mortgage-total-overview"
+
+// Define single payment type
+interface SinglePayment {
+  id: string
+  amount: number
+  date: Date
+}
 
 // Define mortgage type
 interface Mortgage {
@@ -24,9 +37,7 @@ interface Mortgage {
   interestRate: number
   term: number
   extraPayment: number
-  singleExtraPayment?: number
-  singlePaymentMonth?: number
-  singlePaymentYear?: number
+  singlePayments: SinglePayment[]
   isExpanded?: boolean
 }
 
@@ -40,15 +51,21 @@ export default function MortgageCalculator() {
       interestRate: 3.5,
       term: 30,
       extraPayment: 200,
-      singleExtraPayment: 0,
-      singlePaymentMonth: new Date().getMonth() + 1,
-      singlePaymentYear: new Date().getFullYear(),
+      singlePayments: [],
       isExpanded: true,
     },
   ])
 
   const [activeTab, setActiveTab] = useState("summary")
   const [isCopied, setIsCopied] = useState(false)
+
+  // State for managing extra payments modal
+  const [editingMortgageId, setEditingMortgageId] = useState<string | null>(null)
+  const [draftSinglePayments, setDraftSinglePayments] = useState<SinglePayment[]>([])
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // State for tracking timeline visibility
+  const [isTimelineOpen, setIsTimelineOpen] = useState(false)
 
   // Load shared data from URL on initial load
   useEffect(() => {
@@ -59,10 +76,14 @@ export default function MortgageCalculator() {
       try {
         const decodedData = JSON.parse(atob(sharedData))
         if (Array.isArray(decodedData) && decodedData.length > 0) {
-          // Ensure each mortgage has an ID
+          // Ensure each mortgage has an ID and convert date strings back to Date objects
           const mortgagesWithIds = decodedData.map((mortgage, index) => ({
             ...mortgage,
             id: mortgage.id || `mortgage-${index + 1}`,
+            singlePayments: (mortgage.singlePayments || []).map((p: any) => ({
+              ...p,
+              date: new Date(p.date)
+            })),
             isExpanded: index === 0 // Expand only the first mortgage
           }))
           setMortgages(mortgagesWithIds)
@@ -85,15 +106,66 @@ export default function MortgageCalculator() {
       interestRate: 3.5,
       term: 30,
       extraPayment: 100,
-      singleExtraPayment: 0,
-      singlePaymentMonth: new Date().getMonth() + 1,
-      singlePaymentYear: new Date().getFullYear(),
+      singlePayments: [],
       isExpanded: true,
     }
 
     // Collapse all other mortgages
     const updatedMortgages = mortgages.map(m => ({ ...m, isExpanded: false }))
     setMortgages([...updatedMortgages, newMortgage])
+  }
+
+  // Open modal with current payments
+  const openPaymentsModal = (mortgageId: string) => {
+    const mortgage = mortgages.find(m => m.id === mortgageId)
+    if (mortgage) {
+      setEditingMortgageId(mortgageId)
+      // Create a deep copy of the payments for editing
+      setDraftSinglePayments(mortgage.singlePayments.map(p => ({ ...p, date: new Date(p.date) })))
+      setIsModalOpen(true)
+    }
+  }
+
+  // Close modal and discard changes
+  const closePaymentsModal = () => {
+    setIsModalOpen(false)
+    setEditingMortgageId(null)
+    setDraftSinglePayments([])
+  }
+
+  // Save draft payments to the mortgage
+  const saveSinglePayments = () => {
+    if (editingMortgageId) {
+      setMortgages(mortgages.map(mortgage =>
+        mortgage.id === editingMortgageId
+          ? { ...mortgage, singlePayments: draftSinglePayments.map(p => ({ ...p })) }
+          : mortgage
+      ))
+      toast.success("Extra payments updated!")
+      closePaymentsModal()
+    }
+  }
+
+  // Add a draft single payment
+  const addDraftPayment = () => {
+    const newPayment: SinglePayment = {
+      id: `payment-${Date.now()}`,
+      amount: 0,
+      date: new Date()
+    }
+    setDraftSinglePayments([...draftSinglePayments, newPayment])
+  }
+
+  // Remove a draft single payment
+  const removeDraftPayment = (paymentId: string) => {
+    setDraftSinglePayments(draftSinglePayments.filter(p => p.id !== paymentId))
+  }
+
+  // Update a draft single payment
+  const updateDraftPayment = (paymentId: string, field: keyof SinglePayment, value: any) => {
+    setDraftSinglePayments(draftSinglePayments.map(payment =>
+      payment.id === paymentId ? { ...payment, [field]: value } : payment
+    ))
   }
 
   // Remove a mortgage
@@ -133,9 +205,11 @@ export default function MortgageCalculator() {
       interestRate: mortgage.interestRate,
       term: mortgage.term,
       extraPayment: mortgage.extraPayment,
-      singleExtraPayment: mortgage.singleExtraPayment,
-      singlePaymentMonth: mortgage.singlePaymentMonth,
-      singlePaymentYear: mortgage.singlePaymentYear
+      singlePayments: mortgage.singlePayments.map(p => ({
+        id: p.id,
+        amount: p.amount,
+        date: p.date.toISOString()
+      }))
     }))
 
     const encodedData = btoa(JSON.stringify(shareData))
@@ -183,8 +257,35 @@ export default function MortgageCalculator() {
     )
   }
 
-  // Calculate mortgage details for a specific mortgage
-  const calculateMortgageDetails = (mortgage: Mortgage) => {
+  // Payment schedule entry interface
+  interface ScheduleEntry {
+    month: number
+    date: Date
+    payment: number
+    principal: number
+    interest: number
+    extraPayment: number
+    singlePayment: number
+    totalPayment: number
+    balance: number
+  }
+
+  // Unified schedule entry interface
+  interface UnifiedScheduleEntry {
+    date: Date
+    mortgageId: string
+    mortgageName: string
+    payment: number
+    principal: number
+    interest: number
+    extraPayment: number
+    singlePayment: number
+    totalPayment: number
+    balance: number
+  }
+
+  // Calculate mortgage details for a specific mortgage (with optional schedule generation)
+  const calculateMortgageDetails = (mortgage: Mortgage, includeSchedule: boolean = false) => {
     const monthlyPayment = calculateMonthlyPayment(
       mortgage.amount,
       mortgage.interestRate,
@@ -194,9 +295,10 @@ export default function MortgageCalculator() {
     const totalInterest = monthlyPayment * mortgage.term * 12 - mortgage.amount
     const newMonthlyPayment = monthlyPayment + mortgage.extraPayment
 
-    // Calculate new term with extra payments and single payment
+    // Calculate new term with extra payments and single payments
     let newTerm = mortgage.term
     let totalPaidWithExtras = 0
+    const schedule: ScheduleEntry[] = []
 
     if (!isNaN(mortgage.amount) && !isNaN(mortgage.interestRate) &&
       !isNaN(mortgage.term) && !isNaN(mortgage.extraPayment) &&
@@ -208,34 +310,57 @@ export default function MortgageCalculator() {
       let balance = mortgage.amount
       let month = 0
 
-      // Calculate the month when single payment should be applied
+      // Calculate the month when each single payment should be applied
       const currentDate = new Date()
       const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
-      const singlePaymentDate = mortgage.singlePaymentMonth && mortgage.singlePaymentYear
-        ? new Date(mortgage.singlePaymentYear, mortgage.singlePaymentMonth - 1, 1)
-        : null
 
-      // Calculate months from start until single payment
-      let singlePaymentMonthIndex = -1
-      if (singlePaymentDate && mortgage.singleExtraPayment && mortgage.singleExtraPayment > 0) {
-        const monthsDiff = (singlePaymentDate.getFullYear() - startDate.getFullYear()) * 12 +
-                          (singlePaymentDate.getMonth() - startDate.getMonth())
-        if (monthsDiff >= 0 && monthsDiff < numberOfPayments) {
-          singlePaymentMonthIndex = monthsDiff
+      // Create a map of month index to total single payment amount for that month
+      const singlePaymentsByMonth = new Map<number, number>()
+      mortgage.singlePayments.forEach(payment => {
+        if (payment.amount > 0) {
+          const paymentDate = new Date(payment.date)
+          const monthsDiff = (paymentDate.getFullYear() - startDate.getFullYear()) * 12 +
+                            (paymentDate.getMonth() - startDate.getMonth())
+          if (monthsDiff >= 0 && monthsDiff < numberOfPayments) {
+            const existing = singlePaymentsByMonth.get(monthsDiff) || 0
+            singlePaymentsByMonth.set(monthsDiff, existing + payment.amount)
+          }
         }
-      }
+      })
 
       while (balance > 0 && month < numberOfPayments) {
         const interestPayment = balance * monthlyRate
-        let principalPayment = newMonthlyPayment - interestPayment
+        const regularPrincipal = monthlyPayment - interestPayment
+        const extraPrincipal = mortgage.extraPayment
+        const singlePaymentAmount = singlePaymentsByMonth.get(month) || 0
 
-        // Apply single extra payment at the specified month
-        if (month === singlePaymentMonthIndex) {
-          principalPayment += (mortgage.singleExtraPayment || 0)
+        const totalPrincipal = regularPrincipal + extraPrincipal + singlePaymentAmount
+        const newBalance = Math.max(0, balance - totalPrincipal)
+
+        // Adjust if payment would overpay
+        const actualTotalPrincipal = balance - newBalance
+        const totalPaymentAmount = interestPayment + actualTotalPrincipal
+
+        // Only generate schedule if requested
+        if (includeSchedule) {
+          const paymentDate = new Date(startDate)
+          paymentDate.setMonth(paymentDate.getMonth() + month)
+
+          schedule.push({
+            month: month + 1,
+            date: paymentDate,
+            payment: monthlyPayment,
+            principal: regularPrincipal,
+            interest: interestPayment,
+            extraPayment: month < numberOfPayments ? mortgage.extraPayment : 0,
+            singlePayment: singlePaymentAmount,
+            totalPayment: totalPaymentAmount,
+            balance: newBalance
+          })
         }
 
-        balance -= principalPayment
-        totalPaidWithExtras += newMonthlyPayment + (month === singlePaymentMonthIndex ? (mortgage.singleExtraPayment || 0) : 0)
+        balance = newBalance
+        totalPaidWithExtras += totalPaymentAmount
         month++
       }
 
@@ -249,9 +374,48 @@ export default function MortgageCalculator() {
       totalInterest,
       newMonthlyPayment,
       newTerm,
-      interestSaved
+      interestSaved,
+      schedule
     }
   }
+
+  // Generate unified timeline from all mortgages (memoized and only when timeline is open)
+  const unifiedTimeline = useMemo(() => {
+    if (!isTimelineOpen) {
+      return []
+    }
+
+    const allEntries: UnifiedScheduleEntry[] = []
+
+    mortgages.forEach(mortgage => {
+      const details = calculateMortgageDetails(mortgage, true) // Include schedule
+      details.schedule.forEach(entry => {
+        allEntries.push({
+          date: entry.date,
+          mortgageId: mortgage.id,
+          mortgageName: mortgage.name,
+          payment: entry.payment,
+          principal: entry.principal,
+          interest: entry.interest,
+          extraPayment: entry.extraPayment,
+          singlePayment: entry.singlePayment,
+          totalPayment: entry.totalPayment,
+          balance: entry.balance
+        })
+      })
+    })
+
+    // Sort by date
+    return allEntries.sort((a, b) => a.date.getTime() - b.date.getTime())
+  }, [mortgages, isTimelineOpen])
+
+  // Calculate total payment count efficiently (without generating full schedule)
+  const totalPaymentCount = useMemo(() => {
+    return mortgages.reduce((count, mortgage) => {
+      const details = calculateMortgageDetails(mortgage, false) // Don't include schedule
+      return count + Math.ceil(details.newTerm * 12)
+    }, 0)
+  }, [mortgages])
 
   // Calculate total mortgage amount for all mortgages
   const totalMortgageAmount = mortgages.reduce((sum, mortgage) => sum + mortgage.amount, 0)
@@ -347,8 +511,9 @@ export default function MortgageCalculator() {
 
                 {mortgage.isExpanded && (
                   <CardContent className="pt-0">
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                      <div className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {/* Left Column: Form Inputs */}
+                      <div className="space-y-3">
                         <div className="space-y-2">
                           <Label htmlFor={`mortgage-name-${mortgage.id}`}>Mortgage Name</Label>
                           <Input
@@ -358,128 +523,115 @@ export default function MortgageCalculator() {
                           />
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor={`mortgage-amount-${mortgage.id}`}>Mortgage Amount</Label>
-                          <div className="relative">
-                            <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <div className="grid gap-3 grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor={`mortgage-amount-${mortgage.id}`}>Mortgage Amount</Label>
+                            <div className="relative">
+                              <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id={`mortgage-amount-${mortgage.id}`}
+                                type="number"
+                                value={mortgage.amount || ''}
+                                onChange={(e) => handleNumberChange(mortgage.id, "amount", e.target.value)}
+                                className="pl-9"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor={`mortgage-term-${mortgage.id}`}>Term (years)</Label>
                             <Input
-                              id={`mortgage-amount-${mortgage.id}`}
+                              id={`mortgage-term-${mortgage.id}`}
                               type="number"
-                              value={mortgage.amount || ''}
-                              onChange={(e) => handleNumberChange(mortgage.id, "amount", e.target.value)}
-                              className="pl-9"
+                              value={mortgage.term || ''}
+                              onChange={(e) => handleNumberChange(mortgage.id, "term", e.target.value)}
                             />
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor={`interest-rate-${mortgage.id}`}>Interest Rate (%)</Label>
-                          <div className="relative">
-                            <TrendingDown className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              id={`interest-rate-${mortgage.id}`}
-                              type="number"
-                              step="0.1"
-                              value={mortgage.interestRate || ''}
-                              onChange={(e) => handleNumberChange(mortgage.id, "interestRate", e.target.value)}
-                              className="pl-9"
-                            />
+                        <div className="grid gap-3 grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor={`interest-rate-${mortgage.id}`}>Interest Rate (%)</Label>
+                            <div className="relative">
+                              <TrendingDown className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id={`interest-rate-${mortgage.id}`}
+                                type="number"
+                                step="0.1"
+                                value={mortgage.interestRate || ''}
+                                onChange={(e) => handleNumberChange(mortgage.id, "interestRate", e.target.value)}
+                                className="pl-9"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor={`extra-payment-${mortgage.id}`}>Monthly Extra</Label>
+                            <div className="relative">
+                              <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id={`extra-payment-${mortgage.id}`}
+                                type="number"
+                                value={mortgage.extraPayment || ''}
+                                onChange={(e) => handleNumberChange(mortgage.id, "extraPayment", e.target.value)}
+                                className="pl-9"
+                              />
+                            </div>
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor={`mortgage-term-${mortgage.id}`}>Mortgage Term (years)</Label>
-                          <Input
-                            id={`mortgage-term-${mortgage.id}`}
-                            type="number"
-                            value={mortgage.term || ''}
-                            onChange={(e) => handleNumberChange(mortgage.id, "term", e.target.value)}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor={`extra-payment-${mortgage.id}`}>Monthly Extra Payment</Label>
-                          <div className="relative">
-                            <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              id={`extra-payment-${mortgage.id}`}
-                              type="number"
-                              value={mortgage.extraPayment || ''}
-                              onChange={(e) => handleNumberChange(mortgage.id, "extraPayment", e.target.value)}
-                              className="pl-9"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2 pt-4 border-t">
-                          <Label htmlFor={`single-payment-${mortgage.id}`}>Single Extra Payment</Label>
-                          <div className="relative">
-                            <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              id={`single-payment-${mortgage.id}`}
-                              type="number"
-                              value={mortgage.singleExtraPayment || ''}
-                              onChange={(e) => handleNumberChange(mortgage.id, "singleExtraPayment", e.target.value)}
-                              className="pl-9"
-                              placeholder="0"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor={`single-payment-month-${mortgage.id}`}>Payment Month</Label>
-                          <Input
-                            id={`single-payment-month-${mortgage.id}`}
-                            type="number"
-                            min="1"
-                            max="12"
-                            value={mortgage.singlePaymentMonth || ''}
-                            onChange={(e) => handleNumberChange(mortgage.id, "singlePaymentMonth", e.target.value)}
-                            placeholder="1-12"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor={`single-payment-year-${mortgage.id}`}>Payment Year</Label>
-                          <Input
-                            id={`single-payment-year-${mortgage.id}`}
-                            type="number"
-                            value={mortgage.singlePaymentYear || ''}
-                            onChange={(e) => handleNumberChange(mortgage.id, "singlePaymentYear", e.target.value)}
-                            placeholder={new Date().getFullYear().toString()}
-                          />
+                        <div className="space-y-2 pt-2 border-t">
+                          <Label>Single Extra Payments</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => openPaymentsModal(mortgage.id)}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Manage Extra Payments
+                            {mortgage.singlePayments.length > 0 && (
+                              <span className="ml-2 px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full">
+                                {mortgage.singlePayments.length}
+                              </span>
+                            )}
+                          </Button>
+                          {mortgage.singlePayments.length > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Total: {formatCurrency(mortgage.singlePayments.reduce((sum, p) => sum + p.amount, 0))}
+                            </p>
+                          )}
                         </div>
                       </div>
 
-                      <div className="space-y-6">
+                      {/* Right Column: Summary Stats */}
+                      <div className="grid gap-4 grid-cols-2 content-start">
                         <div>
-                          <p className="text-sm font-medium">Regular Monthly Payment</p>
-                          <p className="text-2xl font-bold">{formatCurrency(details.monthlyPayment)}</p>
+                          <p className="text-xs font-medium text-muted-foreground">Regular Monthly Payment</p>
+                          <p className="text-xl font-bold mt-1">{formatCurrency(details.monthlyPayment)}</p>
                         </div>
 
                         <div>
-                          <p className="text-sm font-medium">With Extra Payment</p>
-                          <p className="text-2xl font-bold">{formatCurrency(details.newMonthlyPayment)}</p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {formatCurrency(mortgage.extraPayment)} extra per month
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-6">
-                        <div>
-                          <p className="text-sm font-medium">Time Saved</p>
-                          <p className="text-2xl font-bold">{formatNumber(mortgage.term - details.newTerm)} years</p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Pay off {formatNumber((mortgage.term - details.newTerm) * 12, 0)} months earlier
+                          <p className="text-xs font-medium text-muted-foreground">With Extra Payment</p>
+                          <p className="text-xl font-bold mt-1">{formatCurrency(details.newMonthlyPayment)}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatCurrency(mortgage.extraPayment)} extra
                           </p>
                         </div>
 
                         <div>
-                          <p className="text-sm font-medium">Interest Saved</p>
-                          <p className="text-2xl font-bold text-green-600">{formatCurrency(details.interestSaved)}</p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {formatNumber((details.interestSaved / details.totalInterest) * 100)}% of total interest
+                          <p className="text-xs font-medium text-muted-foreground">Time Saved</p>
+                          <p className="text-xl font-bold mt-1">{formatNumber(mortgage.term - details.newTerm)} years</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatNumber((mortgage.term - details.newTerm) * 12, 0)} months earlier
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">Interest Saved</p>
+                          <p className="text-xl font-bold text-green-600 mt-1">{formatCurrency(details.interestSaved)}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatNumber((details.interestSaved / details.totalInterest) * 100)}% of total
                           </p>
                         </div>
                       </div>
@@ -509,6 +661,76 @@ export default function MortgageCalculator() {
           <MortgageChart mortgages={mortgages} />
         </div>
 
+        {/* Unified Payment Timeline Section */}
+        <div>
+          <h2 className="text-2xl font-bold mb-4">Payment Timeline</h2>
+          <Card>
+            <CardContent className="pt-6">
+              <Collapsible open={isTimelineOpen} onOpenChange={setIsTimelineOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between">
+                    <span className="font-semibold">
+                      View Complete Payment Timeline ({totalPaymentCount} payments across all mortgages)
+                    </span>
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-32">Date</TableHead>
+                          <TableHead>Mortgage</TableHead>
+                          <TableHead className="text-right">Payment</TableHead>
+                          <TableHead className="text-right">Principal</TableHead>
+                          <TableHead className="text-right">Interest</TableHead>
+                          <TableHead className="text-right bg-blue-50 dark:bg-blue-950">Extra</TableHead>
+                          <TableHead className="text-right bg-purple-50 dark:bg-purple-950">Single</TableHead>
+                          <TableHead className="text-right font-semibold">Total</TableHead>
+                          <TableHead className="text-right font-semibold">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {unifiedTimeline.map((entry, index) => (
+                          <TableRow
+                            key={`${entry.mortgageId}-${index}`}
+                            className={index % 2 === 0 ? "bg-muted/30" : ""}
+                          >
+                            <TableCell className="text-sm font-medium">{format(entry.date, "MMM yyyy")}</TableCell>
+                            <TableCell className="text-sm">
+                              <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
+                                {entry.mortgageName}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right text-sm">{formatCurrency(entry.payment)}</TableCell>
+                            <TableCell className="text-right text-sm">{formatCurrency(entry.principal)}</TableCell>
+                            <TableCell className="text-right text-sm">{formatCurrency(entry.interest)}</TableCell>
+                            <TableCell className={cn(
+                              "text-right text-sm font-medium",
+                              entry.extraPayment > 0 && "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+                            )}>
+                              {entry.extraPayment > 0 ? formatCurrency(entry.extraPayment) : "-"}
+                            </TableCell>
+                            <TableCell className={cn(
+                              "text-right text-sm font-medium",
+                              entry.singlePayment > 0 && "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
+                            )}>
+                              {entry.singlePayment > 0 ? formatCurrency(entry.singlePayment) : "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-sm">{formatCurrency(entry.totalPayment)}</TableCell>
+                            <TableCell className="text-right font-semibold text-sm">{formatCurrency(entry.balance)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Comparison Section */}
         <div>
           <h2 className="text-2xl font-bold mb-4">Comparison</h2>
@@ -529,6 +751,126 @@ export default function MortgageCalculator() {
           />
         </div>
       </div>
+
+      {/* Extra Payments Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manage Single Extra Payments</DialogTitle>
+            <DialogDescription>
+              Add one-time extra payments (bonus, tax refund, etc.) and see their impact when you save.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold">Payment Schedule</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addDraftPayment}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Payment
+              </Button>
+            </div>
+
+            {draftSinglePayments.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No extra payments added yet.</p>
+                <p className="text-sm mt-1">Click "Add Payment" to get started.</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                {draftSinglePayments.map((payment, index) => (
+                  <Card key={payment.id} className="p-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-semibold">Payment #{index + 1}</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => removeDraftPayment(payment.id)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-sm">Amount</Label>
+                          <div className="relative mt-1">
+                            <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              value={payment.amount || ''}
+                              onChange={(e) => {
+                                const value = e.target.value === '' ? 0 : Number(e.target.value)
+                                updateDraftPayment(payment.id, "amount", value)
+                              }}
+                              className="pl-9"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-sm">Payment Date</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal mt-1",
+                                  !payment.date && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {payment.date ? format(payment.date, "PP") : <span>Pick date</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={payment.date}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    updateDraftPayment(payment.id, "date", date)
+                                  }
+                                }}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {draftSinglePayments.length > 0 && (
+              <div className="flex items-center justify-between pt-3 border-t">
+                <Label className="text-sm font-semibold">Total Extra Payments:</Label>
+                <span className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                  {formatCurrency(draftSinglePayments.reduce((sum, p) => sum + p.amount, 0))}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closePaymentsModal}>
+              Cancel
+            </Button>
+            <Button onClick={saveSinglePayments} className="bg-purple-600 hover:bg-purple-700">
+              Save & Recalculate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
