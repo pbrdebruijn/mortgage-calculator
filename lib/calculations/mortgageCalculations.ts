@@ -113,7 +113,23 @@ export function calculateMortgageDetails(
     mortgage.type
   )
 
-  const totalInterest = monthlyPayment * mortgage.term * 12 - mortgage.amount
+  // Calculate total interest properly for each mortgage type
+  let totalInterest: number
+  if (mortgage.type === 'linear') {
+    // For linear: sum of interest = (initial interest + final interest) / 2 * months
+    const monthlyRate = mortgage.interestRate / 100 / 12
+    const numberOfPayments = mortgage.term * 12
+    const monthlyPrincipal = mortgage.amount / numberOfPayments
+    // Total interest for linear mortgage
+    totalInterest = (mortgage.amount * monthlyRate * (numberOfPayments + 1)) / 2
+  } else if (mortgage.type === 'aflossingsvrij') {
+    // For interest-only: total interest = principal * rate * years
+    totalInterest = mortgage.amount * (mortgage.interestRate / 100) * mortgage.term
+  } else {
+    // For annuity: use standard calculation
+    totalInterest = monthlyPayment * mortgage.term * 12 - mortgage.amount
+  }
+
   const newMonthlyPayment = monthlyPayment + mortgage.extraPayment
 
   // Calculate new term with extra payments and single payments
