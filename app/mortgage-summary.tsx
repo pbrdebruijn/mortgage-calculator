@@ -34,15 +34,16 @@ export function MortgageSummary({
     const newMonthlyPayment = monthlyPayment + mortgage.extraPayment
 
     // Calculate new term with extra payment and single payments
-    const calculateNewTerm = () => {
+    const calculateNewTermAndTotalPaid = () => {
       if (mortgage.amount <= 0 || mortgage.interestRate <= 0 || mortgage.term <= 0 || mortgage.extraPayment < 0) {
-        return mortgage.term
+        return { newTerm: mortgage.term, totalPaidWithExtras: mortgage.amount }
       }
 
       const monthlyRate = mortgage.interestRate / 100 / 12
       const numberOfPayments = mortgage.term * 12
       let balance = mortgage.amount
       let month = 0
+      let totalPaidWithExtras = 0
 
       // Create a map of month index to total single payment amount for that month
       const startDate = new Date(mortgage.startDate.getFullYear(), mortgage.startDate.getMonth(), 1)
@@ -65,15 +66,25 @@ export function MortgageSummary({
         const regularPrincipal = newMonthlyPayment - interestPayment
         const singlePaymentAmount = singlePaymentsByMonth.get(month) || 0
         const totalPrincipal = regularPrincipal + singlePaymentAmount
-        balance = Math.max(0, balance - totalPrincipal)
+        const newBalance = Math.max(0, balance - totalPrincipal)
+
+        // Accumulate actual total paid (interest + actual principal paid)
+        const actualTotalPrincipal = balance - newBalance
+        const totalPaymentAmount = interestPayment + actualTotalPrincipal
+        totalPaidWithExtras += totalPaymentAmount
+
+        balance = newBalance
         month++
       }
 
-      return month / 12
+      return { newTerm: month / 12, totalPaidWithExtras }
     }
 
-    const newTerm = calculateNewTerm()
-    const interestSaved = totalInterest - (newMonthlyPayment * newTerm * 12 - mortgage.amount)
+    const { newTerm, totalPaidWithExtras } = calculateNewTermAndTotalPaid()
+
+    // Calculate interest saved using exact total paid
+    const newTotalInterest = totalPaidWithExtras - mortgage.amount
+    const interestSaved = totalInterest - newTotalInterest
 
     return {
       monthlyPayment,
@@ -81,6 +92,8 @@ export function MortgageSummary({
       newMonthlyPayment,
       newTerm,
       interestSaved,
+      actualTotalPaid: totalPaidWithExtras,
+      newTotalInterest,
     }
   })
 
@@ -90,8 +103,16 @@ export function MortgageSummary({
   const extraPayment = mortgages.reduce((sum, m) => sum + m.extraPayment, 0)
   const totalInterest = mortgageDetails.reduce((sum, d) => sum + d.totalInterest, 0)
   const interestSaved = mortgageDetails.reduce((sum, d) => sum + d.interestSaved, 0)
-  const mortgageTerm = Math.max(...mortgages.map(m => m.term))
-  const newTerm = Math.max(...mortgageDetails.map(d => d.newTerm))
+  const actualTotalPaid = mortgageDetails.reduce((sum, d) => sum + d.actualTotalPaid, 0)
+  const newTotalInterest = mortgageDetails.reduce((sum, d) => sum + d.newTotalInterest, 0)
+
+  // Calculate weighted average terms based on mortgage amounts (guard against division by zero)
+  const mortgageTerm = mortgageAmount > 0
+    ? mortgages.reduce((sum, m) => sum + (m.term * m.amount), 0) / mortgageAmount
+    : 0
+  const newTerm = mortgageAmount > 0
+    ? mortgageDetails.reduce((sum, d, idx) => sum + (d.newTerm * mortgages[idx].amount), 0) / mortgageAmount
+    : 0
 
   // Calculate weighted average interest rate (guard against division by zero)
   const weightedInterestRate = mortgageAmount > 0
@@ -154,11 +175,11 @@ export function MortgageSummary({
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">New Total Cost</TableCell>
-                <TableCell>{formatCurrency(mortgageAmount + totalInterest - interestSaved)}</TableCell>
+                <TableCell>{formatCurrency(actualTotalPaid)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">New Total Interest</TableCell>
-                <TableCell>{formatCurrency(totalInterest - interestSaved)}</TableCell>
+                <TableCell>{formatCurrency(newTotalInterest)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">Interest Saved</TableCell>

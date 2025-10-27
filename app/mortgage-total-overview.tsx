@@ -47,11 +47,12 @@ export function MortgageTotalOverview({
     const newMonthlyPayment = monthlyPayment + mortgage.extraPayment
 
     // Calculate new mortgage term with extra payment and single payments
-    const calculateNewTerm = () => {
+    const calculateNewTermAndTotalPaid = () => {
       const monthlyRate = mortgage.interestRate / 100 / 12
       const numberOfPayments = mortgage.term * 12
       let balance = mortgage.amount
       let month = 0
+      let totalPaidWithExtras = 0
 
       // Create a map of month index to total single payment amount for that month
       const startDate = new Date(mortgage.startDate.getFullYear(), mortgage.startDate.getMonth(), 1)
@@ -74,17 +75,25 @@ export function MortgageTotalOverview({
         const regularPrincipal = newMonthlyPayment - interestPayment
         const singlePaymentAmount = singlePaymentsByMonth.get(month) || 0
         const totalPrincipal = regularPrincipal + singlePaymentAmount
-        balance = Math.max(0, balance - totalPrincipal)
+        const newBalance = Math.max(0, balance - totalPrincipal)
+
+        // Accumulate actual total paid (interest + actual principal paid)
+        const actualTotalPrincipal = balance - newBalance
+        const totalPaymentAmount = interestPayment + actualTotalPrincipal
+        totalPaidWithExtras += totalPaymentAmount
+
+        balance = newBalance
         month++
       }
 
-      return month / 12
+      return { newTerm: month / 12, totalPaidWithExtras }
     }
 
-    const newTerm = calculateNewTerm()
+    const { newTerm, totalPaidWithExtras } = calculateNewTermAndTotalPaid()
 
-    // Calculate interest saved
-    const interestSaved = totalInterest - (newMonthlyPayment * newTerm * 12 - mortgage.amount)
+    // Calculate interest saved using exact total paid
+    const newTotalInterest = totalPaidWithExtras - mortgage.amount
+    const interestSaved = totalInterest - newTotalInterest
 
     return {
       ...mortgage,
@@ -94,7 +103,7 @@ export function MortgageTotalOverview({
       newTerm,
       interestSaved,
       totalCost: mortgage.amount + totalInterest,
-      newTotalCost: mortgage.amount + totalInterest - interestSaved,
+      newTotalCost: totalPaidWithExtras,
     }
   })
 

@@ -38,15 +38,16 @@ export function MortgageComparison({
     const newMonthlyPayment = monthlyPayment + mortgage.extraPayment
 
     // Calculate new term with extra payment and single payments
-    const calculateNewTerm = () => {
+    const calculateNewTermAndTotalPaid = () => {
       if (mortgage.amount <= 0 || mortgage.interestRate <= 0 || mortgage.term <= 0 || mortgage.extraPayment < 0) {
-        return mortgage.term
+        return { newTerm: mortgage.term, totalPaidWithExtras: mortgage.amount }
       }
 
       const monthlyRate = mortgage.interestRate / 100 / 12
       const numberOfPayments = mortgage.term * 12
       let balance = mortgage.amount
       let month = 0
+      let totalPaidWithExtras = 0
 
       // Create a map of month index to total single payment amount for that month
       const startDate = new Date(mortgage.startDate.getFullYear(), mortgage.startDate.getMonth(), 1)
@@ -69,15 +70,24 @@ export function MortgageComparison({
         const regularPrincipal = newMonthlyPayment - interestPayment
         const singlePaymentAmount = singlePaymentsByMonth.get(month) || 0
         const totalPrincipal = regularPrincipal + singlePaymentAmount
-        balance = Math.max(0, balance - totalPrincipal)
+        const newBalance = Math.max(0, balance - totalPrincipal)
+
+        // Accumulate actual total paid (interest + actual principal paid)
+        const actualTotalPrincipal = balance - newBalance
+        const totalPaymentAmount = interestPayment + actualTotalPrincipal
+        totalPaidWithExtras += totalPaymentAmount
+
+        balance = newBalance
         month++
       }
 
-      return month / 12
+      return { newTerm: month / 12, totalPaidWithExtras }
     }
 
-    const newTerm = calculateNewTerm()
-    const interestSaved = totalInterest - (newMonthlyPayment * newTerm * 12 - mortgage.amount)
+    const { newTerm, totalPaidWithExtras } = calculateNewTermAndTotalPaid()
+
+    // Calculate interest saved using exact total paid
+    const interestSaved = totalInterest - (totalPaidWithExtras - mortgage.amount)
 
     return {
       monthlyPayment,
@@ -86,7 +96,7 @@ export function MortgageComparison({
       newTerm,
       interestSaved,
       regularTotalPayments: monthlyPayment * mortgage.term * 12,
-      extraTotalPayments: newMonthlyPayment * newTerm * 12,
+      extraTotalPayments: totalPaidWithExtras,
     }
   })
 
@@ -98,8 +108,14 @@ export function MortgageComparison({
   const interestSaved = mortgageDetails.reduce((sum, d) => sum + d.interestSaved, 0)
   const totalRegularPayments = mortgageDetails.reduce((sum, d) => sum + d.regularTotalPayments, 0)
   const totalExtraPayments = mortgageDetails.reduce((sum, d) => sum + d.extraTotalPayments, 0)
-  const mortgageTerm = Math.max(...mortgages.map(m => m.term))
-  const newTerm = Math.max(...mortgageDetails.map(d => d.newTerm))
+
+  // Calculate weighted average terms based on mortgage amounts (guard against division by zero)
+  const mortgageTerm = mortgageAmount > 0
+    ? mortgages.reduce((sum, m) => sum + (m.term * m.amount), 0) / mortgageAmount
+    : 0
+  const newTerm = mortgageAmount > 0
+    ? mortgageDetails.reduce((sum, d, idx) => sum + (d.newTerm * mortgages[idx].amount), 0) / mortgageAmount
+    : 0
 
   // Calculate percentages for visualization (guard against division by zero)
   const regularPrincipalPercentage = totalRegularPayments > 0
