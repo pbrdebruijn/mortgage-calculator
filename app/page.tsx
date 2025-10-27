@@ -511,8 +511,9 @@ export default function MortgageCalculator() {
 
                 {mortgage.isExpanded && (
                   <CardContent className="pt-0">
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                      <div className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {/* Left Column: Form Inputs */}
+                      <div className="space-y-3">
                         <div className="space-y-2">
                           <Label htmlFor={`mortgage-name-${mortgage.id}`}>Mortgage Name</Label>
                           <Input
@@ -522,60 +523,64 @@ export default function MortgageCalculator() {
                           />
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor={`mortgage-amount-${mortgage.id}`}>Mortgage Amount</Label>
-                          <div className="relative">
-                            <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <div className="grid gap-3 grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor={`mortgage-amount-${mortgage.id}`}>Mortgage Amount</Label>
+                            <div className="relative">
+                              <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id={`mortgage-amount-${mortgage.id}`}
+                                type="number"
+                                value={mortgage.amount || ''}
+                                onChange={(e) => handleNumberChange(mortgage.id, "amount", e.target.value)}
+                                className="pl-9"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor={`mortgage-term-${mortgage.id}`}>Term (years)</Label>
                             <Input
-                              id={`mortgage-amount-${mortgage.id}`}
+                              id={`mortgage-term-${mortgage.id}`}
                               type="number"
-                              value={mortgage.amount || ''}
-                              onChange={(e) => handleNumberChange(mortgage.id, "amount", e.target.value)}
-                              className="pl-9"
+                              value={mortgage.term || ''}
+                              onChange={(e) => handleNumberChange(mortgage.id, "term", e.target.value)}
                             />
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor={`interest-rate-${mortgage.id}`}>Interest Rate (%)</Label>
-                          <div className="relative">
-                            <TrendingDown className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              id={`interest-rate-${mortgage.id}`}
-                              type="number"
-                              step="0.1"
-                              value={mortgage.interestRate || ''}
-                              onChange={(e) => handleNumberChange(mortgage.id, "interestRate", e.target.value)}
-                              className="pl-9"
-                            />
+                        <div className="grid gap-3 grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor={`interest-rate-${mortgage.id}`}>Interest Rate (%)</Label>
+                            <div className="relative">
+                              <TrendingDown className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id={`interest-rate-${mortgage.id}`}
+                                type="number"
+                                step="0.1"
+                                value={mortgage.interestRate || ''}
+                                onChange={(e) => handleNumberChange(mortgage.id, "interestRate", e.target.value)}
+                                className="pl-9"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor={`extra-payment-${mortgage.id}`}>Monthly Extra</Label>
+                            <div className="relative">
+                              <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id={`extra-payment-${mortgage.id}`}
+                                type="number"
+                                value={mortgage.extraPayment || ''}
+                                onChange={(e) => handleNumberChange(mortgage.id, "extraPayment", e.target.value)}
+                                className="pl-9"
+                              />
+                            </div>
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor={`mortgage-term-${mortgage.id}`}>Mortgage Term (years)</Label>
-                          <Input
-                            id={`mortgage-term-${mortgage.id}`}
-                            type="number"
-                            value={mortgage.term || ''}
-                            onChange={(e) => handleNumberChange(mortgage.id, "term", e.target.value)}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor={`extra-payment-${mortgage.id}`}>Monthly Extra Payment</Label>
-                          <div className="relative">
-                            <Euro className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              id={`extra-payment-${mortgage.id}`}
-                              type="number"
-                              value={mortgage.extraPayment || ''}
-                              onChange={(e) => handleNumberChange(mortgage.id, "extraPayment", e.target.value)}
-                              className="pl-9"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-3 pt-4 border-t">
+                        <div className="space-y-2 pt-2 border-t">
                           <Label>Single Extra Payments</Label>
                           <Button
                             type="button"
@@ -599,35 +604,34 @@ export default function MortgageCalculator() {
                         </div>
                       </div>
 
-                      <div className="space-y-6">
+                      {/* Right Column: Summary Stats */}
+                      <div className="grid gap-4 grid-cols-2 content-start">
                         <div>
-                          <p className="text-sm font-medium">Regular Monthly Payment</p>
-                          <p className="text-2xl font-bold">{formatCurrency(details.monthlyPayment)}</p>
+                          <p className="text-xs font-medium text-muted-foreground">Regular Monthly Payment</p>
+                          <p className="text-xl font-bold mt-1">{formatCurrency(details.monthlyPayment)}</p>
                         </div>
 
                         <div>
-                          <p className="text-sm font-medium">With Extra Payment</p>
-                          <p className="text-2xl font-bold">{formatCurrency(details.newMonthlyPayment)}</p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {formatCurrency(mortgage.extraPayment)} extra per month
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-6">
-                        <div>
-                          <p className="text-sm font-medium">Time Saved</p>
-                          <p className="text-2xl font-bold">{formatNumber(mortgage.term - details.newTerm)} years</p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Pay off {formatNumber((mortgage.term - details.newTerm) * 12, 0)} months earlier
+                          <p className="text-xs font-medium text-muted-foreground">With Extra Payment</p>
+                          <p className="text-xl font-bold mt-1">{formatCurrency(details.newMonthlyPayment)}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatCurrency(mortgage.extraPayment)} extra
                           </p>
                         </div>
 
                         <div>
-                          <p className="text-sm font-medium">Interest Saved</p>
-                          <p className="text-2xl font-bold text-green-600">{formatCurrency(details.interestSaved)}</p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {formatNumber((details.interestSaved / details.totalInterest) * 100)}% of total interest
+                          <p className="text-xs font-medium text-muted-foreground">Time Saved</p>
+                          <p className="text-xl font-bold mt-1">{formatNumber(mortgage.term - details.newTerm)} years</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatNumber((mortgage.term - details.newTerm) * 12, 0)} months earlier
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">Interest Saved</p>
+                          <p className="text-xl font-bold text-green-600 mt-1">{formatCurrency(details.interestSaved)}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatNumber((details.interestSaved / details.totalInterest) * 100)}% of total
                           </p>
                         </div>
                       </div>

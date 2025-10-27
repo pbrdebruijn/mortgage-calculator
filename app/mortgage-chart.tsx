@@ -14,6 +14,11 @@ interface MortgageChartProps {
     interestRate: number
     term: number
     extraPayment: number
+    singlePayments: Array<{
+      id: string
+      date: string
+      amount: number
+    }>
   }>
 }
 
@@ -50,21 +55,44 @@ export function MortgageChart({ mortgages = [] }: MortgageChartProps) {
         (mortgage.amount * monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) /
         (Math.pow(1 + monthlyRate, numberOfPayments) - 1) : 0
 
-      const totalMonthlyPayment = monthlyPayment + mortgage.extraPayment
+      // Create a map of month index to total single payment amount for that month
+      const currentDate = new Date()
+      const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+      const singlePaymentsByMonth = new Map<number, number>()
+
+      mortgage.singlePayments.forEach(payment => {
+        if (payment.amount > 0) {
+          const paymentDate = new Date(payment.date)
+          const monthsDiff = (paymentDate.getFullYear() - startDate.getFullYear()) * 12 +
+                            (paymentDate.getMonth() - startDate.getMonth())
+          if (monthsDiff >= 0 && monthsDiff < numberOfPayments) {
+            const existing = singlePaymentsByMonth.get(monthsDiff) || 0
+            singlePaymentsByMonth.set(monthsDiff, existing + payment.amount)
+          }
+        }
+      })
+
       let balance = mortgage.amount
+      let monthIndex = 0
 
       for (let year = 0; year <= mortgage.term && year <= maxTerm; year++) {
-        if (balance > 0) {
+        // Set balance at the beginning of the year
+        data[year][mortgage.id] = Math.round(balance)
+
+        if (balance > 0 && year < mortgage.term) {
           // Calculate balance after one year of payments
           for (let i = 0; i < 12 && balance > 0; i++) {
             const interestPayment = balance * monthlyRate
-            const principalPayment = totalMonthlyPayment - interestPayment
-            balance = Math.max(0, balance - principalPayment)
+            const regularPrincipal = monthlyPayment - interestPayment
+            const extraPrincipal = mortgage.extraPayment
+            const singlePaymentAmount = singlePaymentsByMonth.get(monthIndex) || 0
+
+            const totalPrincipal = regularPrincipal + extraPrincipal + singlePaymentAmount
+            balance = Math.max(0, balance - totalPrincipal)
+
+            monthIndex++
           }
         }
-
-        // Update data for this mortgage
-        data[year][mortgage.id] = Math.round(balance)
       }
     })
 
@@ -111,7 +139,7 @@ export function MortgageChart({ mortgages = [] }: MortgageChartProps) {
     <Card className="w-full">
       <CardHeader>
         <CardTitle>Mortgage Balance Over Time</CardTitle>
-        <CardDescription>Compare balance reduction for each mortgage</CardDescription>
+        <CardDescription>Balance reduction including monthly and single extra payments</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
